@@ -1,0 +1,11 @@
+﻿namespace Macaron.PropertyAccessor;
+
+public sealed class ReadOnlyProperty<T, TProperty>(Func<T, TProperty> getter) : IReadOnlyProperty<T, TProperty>
+{
+    #region IReadonlyProperty<T, TProperty> Interface
+    public TProperty Get(T instance)
+    {
+        return getter.Invoke(instance);
+    }
+    #endregion
+}
