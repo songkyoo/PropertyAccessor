@@ -19,7 +19,8 @@
   </ItemGroup>
   
   <ItemGroup>
-    <ProjectReference Include="..\PropertyAccessor\PropertyAccessor.csproj" />
+    <ProjectReference Include="..\PropertyAccessor.Core\PropertyAccessor.Core.csproj" />
+    <ProjectReference Include="..\PropertyAccessor.Generator\PropertyAccessor.Generator.csproj" />
   </ItemGroup>
 
   <ItemGroup>

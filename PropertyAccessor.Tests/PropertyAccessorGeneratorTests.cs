@@ -9,10 +9,12 @@ public class PropertyAccessorGeneratorTests
 {
     private static void Assert(string sourceCode, string expected)
     {
+        var attributeAssembly = typeof(SetterAttribute).Assembly;
         var references = AppDomain
             .CurrentDomain
             .GetAssemblies()
             .Where(assembly => !assembly.IsDynamic && !string.IsNullOrWhiteSpace(assembly.Location))
+            .Append(attributeAssembly)
             .Select(assembly => MetadataReference.CreateFromFile(assembly.Location))
             .Cast<MetadataReference>()
             .ToImmutableArray();
@@ -38,7 +40,7 @@ public class PropertyAccessorGeneratorTests
 
         var result = driver.RunGenerators(compilation).GetRunResult().Results.Single();
         var generatedSources = result.GeneratedSources;
-        var actual = generatedSources.Length > 2 ? generatedSources[2].SourceText.ToString() : "";
+        var actual = generatedSources.FirstOrDefault().SourceText.ToString();
 
         NUnit.Framework.Assert.That(actual, Is.EqualTo(expected));
     }
