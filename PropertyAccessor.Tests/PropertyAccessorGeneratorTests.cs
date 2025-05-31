@@ -180,7 +180,11 @@ public class PropertyAccessorGeneratorTests
         Assert(
             sourceCode:
             """
+            using System.Collections.Generic;
+
             namespace Macaron.PropertyAccessor.Tests;
+
+            public sealed record Bar;
 
             public class Bar<TValue>
             {
@@ -190,7 +194,10 @@ public class PropertyAccessorGeneratorTests
             public partial struct Foo<T>
             {
                 [Getter, Setter]
-                private Bar<T> _answer;
+                private IReadOnlyList<Bar> _answers1;
+
+                [Getter, Setter]
+                private Bar<T>[] _answers2;
             }
             """,
             expected:
@@ -202,10 +209,16 @@ public class PropertyAccessorGeneratorTests
             {
                 partial struct Foo<T>
                 {
-                    public global::Macaron.PropertyAccessor.Tests.Bar<T> Answer
+                    public global::System.Collections.Generic.IReadOnlyList<global::Macaron.PropertyAccessor.Tests.Bar> Answers1
                     {
-                        get => _answer;
-                        set => _answer = value;
+                        get => _answers1;
+                        set => _answers1 = value;
+                    }
+
+                    public global::Macaron.PropertyAccessor.Tests.Bar<T>[] Answers2
+                    {
+                        get => _answers2;
+                        set => _answers2 = value;
                     }
                 }
             }
