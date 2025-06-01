@@ -456,7 +456,7 @@ public sealed class PropertyAccessorGenerator : IIncrementalGenerator
                     var semanticModel = generatorSyntaxContext.SemanticModel;
                     if (semanticModel.GetDeclaredSymbol(generatorSyntaxContext.Node) is not INamedTypeSymbol typeSymbol)
                     {
-                        return (null, diagnosticsBuilder.ToImmutable());
+                        return ((TypeContext?)null, diagnosticsBuilder.ToImmutable());
                     }
 
                     var attributeSymbol = typeSymbol
@@ -467,12 +467,12 @@ public sealed class PropertyAccessorGenerator : IIncrementalGenerator
                         });
                     if (attributeSymbol == null)
                     {
-                        return (null, diagnosticsBuilder.ToImmutable());
+                        return ((TypeContext?)null, diagnosticsBuilder.ToImmutable());
                     }
 
                     if (!visitedTypes.Add(typeSymbol))
                     {
-                        return (null, diagnosticsBuilder.ToImmutable());
+                        return ((TypeContext?)null, diagnosticsBuilder.ToImmutable());
                     }
 
                     var prefixArgument = attributeSymbol.ConstructorArguments[1].Value;
@@ -486,7 +486,7 @@ public sealed class PropertyAccessorGenerator : IIncrementalGenerator
                             messageArgs: [prefixArgument]
                         ));
 
-                        return (null, diagnosticsBuilder.ToImmutable());
+                        return ((TypeContext?)null, diagnosticsBuilder.ToImmutable());
                     }
 
                     return (
