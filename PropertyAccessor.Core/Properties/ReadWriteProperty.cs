@@ -1,4 +1,4 @@
-﻿namespace Macaron.PropertyAccessor;
+﻿namespace Macaron.PropertyAccessor.Properties;
 
 public static class ReadWriteProperty
 {

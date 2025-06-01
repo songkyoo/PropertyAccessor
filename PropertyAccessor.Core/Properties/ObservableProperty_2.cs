@@ -1,4 +1,4 @@
-﻿namespace Macaron.PropertyAccessor;
+﻿namespace Macaron.PropertyAccessor.Properties;
 
 public sealed class ObservableProperty<T, TProperty>(
     TProperty initialValue,

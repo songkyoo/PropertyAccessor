@@ -1,4 +1,4 @@
-﻿namespace Macaron.PropertyAccessor;
+﻿namespace Macaron.PropertyAccessor.Properties;
 
 public sealed class ReadWriteProperty<TProperty>(Func<TProperty> getter, Action<TProperty> setter)
     : IReadWriteProperty<TProperty>
