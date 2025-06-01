@@ -20,7 +20,7 @@ public sealed class ObservableProperty<TProperty>(
     {
         var oldValue = _value;
 
-        if (!onBeforeSet?.Invoke(oldValue, value) ?? false)
+        if (onBeforeSet?.Invoke(oldValue, value) == false)
         {
             return;
         }
