@@ -96,7 +96,7 @@ public sealed class PropertyAccessorGenerator : IIncrementalGenerator
         isEnabledByDefault: true
     );
 
-    private static readonly Regex DefaultRegex = new(pattern: "^(_|m_)");
+    private static readonly Regex DefaultRegex = new(pattern: "^(_|m_)", RegexOptions.Compiled);
 
     private static ImmutableArray<(PropertyContext?, ImmutableArray<Diagnostic>)> GetFieldContexts(
         TypeContext typeContext
