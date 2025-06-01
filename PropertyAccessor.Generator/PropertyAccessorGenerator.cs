@@ -1,9 +1,11 @@
 ﻿using System.Collections.Immutable;
 using System.Text.RegularExpressions;
 using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 
 using static Macaron.PropertyAccessor.SourceGenerationHelpers;
+using static Microsoft.CodeAnalysis.CSharp.SyntaxFacts;
 using static Microsoft.CodeAnalysis.SymbolDisplayFormat;
 
 namespace Macaron.PropertyAccessor;
@@ -98,7 +100,7 @@ public sealed class PropertyAccessorGenerator : IIncrementalGenerator
 
     private static readonly Regex DefaultRegex = new(pattern: "^(_|m_)", RegexOptions.Compiled);
 
-    private static ImmutableArray<(PropertyContext?, ImmutableArray<Diagnostic>)> GetFieldContexts(
+    private static ImmutableArray<(PropertyContext?, ImmutableArray<Diagnostic>)> GetPropertyContexts(
         TypeContext typeContext
     )
     {
@@ -354,19 +356,22 @@ public sealed class PropertyAccessorGenerator : IIncrementalGenerator
             return ImmutableArray<string>.Empty;
         }
 
+        var escapedFieldName = GetEscapedKeyword(fieldName);
+        var escapedPropertyName = GetEscapedKeyword(propertyName);
+
         var builder = ImmutableArray.CreateBuilder<string>();
 
-        builder.Add($"{GetAccessorModifier(accessModifier)} {typeSymbol.ToDisplayString(FullyQualifiedFormat)} {propertyName}");
+        builder.Add($"{GetAccessorModifier(accessModifier)} {typeSymbol.ToDisplayString(FullyQualifiedFormat)} {escapedPropertyName}");
         builder.Add($"{{");
 
         if (hasGetter)
         {
-            builder.Add($"{Space}get => {fieldName}{(isDelegatedProperty ? ".Get(this)" : "")};");
+            builder.Add($"{Space}get => {escapedFieldName}{(isDelegatedProperty ? ".Get(this)" : "")};");
         }
 
         if (hasSetter)
         {
-            builder.Add($"{Space}set => {fieldName}{(isDelegatedProperty ? ".Set(this, value)" : " = value")};");
+            builder.Add($"{Space}set => {escapedFieldName}{(isDelegatedProperty ? ".Set(this, value)" : " = value")};");
         }
 
         builder.Add($"}}");
@@ -431,6 +436,13 @@ public sealed class PropertyAccessorGenerator : IIncrementalGenerator
 
         var namingRule = (PropertyNamingRule)value;
         return namingRule != PropertyNamingRule.Default ? namingRule : defaultValue;
+    }
+
+    private static string GetEscapedKeyword(string keyword)
+    {
+        return GetKeywordKind(keyword) != SyntaxKind.None || GetContextualKeywordKind(keyword) != SyntaxKind.None
+            ? "@" + keyword
+            : keyword;
     }
     #endregion
 
@@ -517,19 +529,19 @@ public sealed class PropertyAccessorGenerator : IIncrementalGenerator
 
                 var builder = ImmutableArray.CreateBuilder<string>();
 
-                foreach (var (fieldContext, fieldDiagnostics) in GetFieldContexts(typeContext))
+                foreach (var (propertyContext, fieldDiagnostics) in GetPropertyContexts(typeContext))
                 {
                     foreach (var diagnostic in fieldDiagnostics)
                     {
                         sourceProductionContext.ReportDiagnostic(diagnostic);
                     }
 
-                    if (fieldContext == null)
+                    if (propertyContext == null)
                     {
                         continue;
                     }
 
-                    var lines = GenerateAccessorCode(fieldContext);
+                    var lines = GenerateAccessorCode(propertyContext);
                     if (lines.IsEmpty)
                     {
                         continue;
