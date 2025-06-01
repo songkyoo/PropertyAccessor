@@ -1,6 +1,6 @@
 ﻿namespace Macaron.PropertyAccessor.Properties;
 
-public sealed class MappedProperty<TRaw, TProperty>(TRaw value, Func<TRaw, TProperty> map)
+public sealed class MappedProperty<TValue, TProperty>(TValue value, Func<TValue, TProperty> map)
     : IReadOnlyProperty<TProperty>
 {
     #region IReadOnlyProperty<TProperty> Interface
