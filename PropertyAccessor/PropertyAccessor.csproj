@@ -16,23 +16,25 @@
     <RepositoryUrl>https://github.com/songkyoo/PropertyAccessor</RepositoryUrl>
     <Version>1.0.1</Version>
   </PropertyGroup>
-  
+
   <ItemGroup>
-    <ProjectReference Include="..\PropertyAccessor.Core\PropertyAccessor.Core.csproj"
-                      GeneratePathProperty="true" />
-    <ProjectReference Include="..\PropertyAccessor.Generator\PropertyAccessor.Generator.csproj"
-                      GeneratePathProperty="true" />
+    <ProjectReference Include="..\PropertyAccessor.Core\PropertyAccessor.Core.csproj">
+      <ExcludeAssets>runtime; build; native; contentfiles; analyzers</ExcludeAssets>
+      <IncludeAssets>compile</IncludeAssets>
+      <PrivateAssets>all</PrivateAssets>
+      <ReferenceOutputAssembly>true</ReferenceOutputAssembly>
+    </ProjectReference>
+    <ProjectReference Include="..\PropertyAccessor.Generator\PropertyAccessor.Generator.csproj">
+      <ExcludeAssets>runtime; build; native; contentfiles; analyzers</ExcludeAssets>
+      <IncludeAssets>compile</IncludeAssets>
+      <PrivateAssets>all</PrivateAssets>
+      <ReferenceOutputAssembly>true</ReferenceOutputAssembly>
+    </ProjectReference>
   </ItemGroup>
 
   <ItemGroup>
-    <None Include="$(OutputPath)PropertyAccessor.Core.dll"
-          Pack="true"
-          PackagePath="lib/netstandard2.0"
-          Condition="Exists('$(OutputPath)PropertyAccessor.Core.dll')" />
-    <None Include="$(OutputPath)PropertyAccessor.Generator.dll"
-          Pack="true"
-          PackagePath="analyzers/dotnet/cs"
-          Condition="Exists('$(OutputPath)PropertyAccessor.Generator.dll')" />
+    <None Include="..\PropertyAccessor.Core\bin\Release\netstandard2.0\PropertyAccessor.Core.dll" Pack="true" PackagePath="lib/netstandard2.0" />
+    <None Include="..\PropertyAccessor.Generator\bin\Release\netstandard2.0\PropertyAccessor.Generator.dll" Pack="true" PackagePath="analyzers/dotnet/cs/" />
   </ItemGroup>
 
 </Project>
