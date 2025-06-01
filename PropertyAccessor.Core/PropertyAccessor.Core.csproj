@@ -8,4 +8,8 @@
     <TargetFramework>netstandard2.0</TargetFramework>
   </PropertyGroup>
 
+  <PropertyGroup>
+    <Version>1.0.2</Version>
+  </PropertyGroup>
+
 </Project>
