@@ -23,7 +23,7 @@ public sealed class PropertyAccessorGenerator : IIncrementalGenerator
     private sealed record TypeContext(
         INamedTypeSymbol Symbol,
         PropertyAccessModifier AccessModifier,
-        string Prefix,
+        Regex Prefix,
         PropertyNamingRule NamingRule
     );
 
@@ -79,9 +79,25 @@ public sealed class PropertyAccessorGenerator : IIncrementalGenerator
         DiagnosticSeverity.Error,
         isEnabledByDefault: true
     );
-    #endregion
+    private static readonly DiagnosticDescriptor PropertyNameSameAsFieldNameRule = new(
+        id: "PA0006",
+        title: "Generated property name is same as field name",
+        messageFormat: "Field '{0}' with prefix pattern '{1}' results in property name '{2}' which is same as field name",
+        category: "Naming",
+        DiagnosticSeverity.Warning,
+        isEnabledByDefault: true
+    );
+    private static readonly DiagnosticDescriptor InvalidPrefixPatternRule = new(
+        id: "PA0007",
+        title: "Invalid prefix pattern",
+        messageFormat: "Prefix pattern '{0}' is not a valid regular expression",
+        category: "Usage",
+        DiagnosticSeverity.Error,
+        isEnabledByDefault: true
+    );
 
-    #region Static
+    private static readonly Regex DefaultRegex = new(pattern: "^(_|m_)");
+
     private static ImmutableArray<(PropertyContext?, ImmutableArray<Diagnostic>)> GetFieldContexts(
         TypeContext typeContext
     )
@@ -92,13 +108,13 @@ public sealed class PropertyAccessorGenerator : IIncrementalGenerator
             .GetMembers()
             .OfType<IFieldSymbol>()
             .Select(symbol => GetGenerationContext(symbol, accessModifier, prefix, namingRule))
-            .ToImmutableArray()!;
+            .ToImmutableArray();
     }
 
     private static (PropertyContext?, ImmutableArray<Diagnostic>) GetGenerationContext(
         IFieldSymbol fieldSymbol,
         PropertyAccessModifier accessModifier,
-        string prefix,
+        Regex prefix,
         PropertyNamingRule namingRule
     )
     {
@@ -136,17 +152,43 @@ public sealed class PropertyAccessorGenerator : IIncrementalGenerator
             }
         }
 
+        var prefixArgument = autoPropertyAttribute?.ConstructorArguments[1].Value;
+        var memberLevelPrefix = GetPrefix(prefixArgument, prefix);
+
+        if (memberLevelPrefix == null)
+        {
+            diagnosticsBuilder.Add(Diagnostic.Create(
+                descriptor: InvalidPrefixPatternRule,
+                location: autoPropertyAttribute?.ApplicationSyntaxReference?.GetSyntax().GetLocation(),
+                messageArgs: [prefixArgument]
+            ));
+
+            return (null, diagnosticsBuilder.ToImmutable());
+        }
+
         var propertyName = GetPropertyName(
             fieldName: fieldName,
-            prefix: GetPrefix(autoPropertyAttribute?.ConstructorArguments[1].Value, prefix),
+            prefix: memberLevelPrefix,
             namingRule: GetNamingRule(autoPropertyAttribute?.ConstructorArguments[2].Value, namingRule)
         );
+
         if (propertyName.Length < 1)
         {
             diagnosticsBuilder.Add(Diagnostic.Create(
                 descriptor: InvalidPropertyNameAfterPrefixRemovalRule,
                 location: fieldSymbol.Locations.FirstOrDefault(),
                 messageArgs: [fieldName, prefix]
+            ));
+
+            return (null, diagnosticsBuilder.ToImmutable());
+        }
+
+        if (propertyName == fieldName)
+        {
+            diagnosticsBuilder.Add(Diagnostic.Create(
+                descriptor: PropertyNameSameAsFieldNameRule,
+                location: fieldSymbol.Locations.FirstOrDefault(),
+                messageArgs: [fieldName, prefix, propertyName]
             ));
 
             return (null, diagnosticsBuilder.ToImmutable());
@@ -277,9 +319,9 @@ public sealed class PropertyAccessorGenerator : IIncrementalGenerator
             };
         }
 
-        static string GetPropertyName(string fieldName, string prefix, PropertyNamingRule namingRule)
+        static string GetPropertyName(string fieldName, Regex prefix, PropertyNamingRule namingRule)
         {
-            var prefixRemovedName = Regex.Replace(input: fieldName, pattern: $"^{prefix}", replacement: "");
+            var prefixRemovedName = prefix.Replace(input: fieldName, replacement: "", count: 1);
             if (prefixRemovedName.Length < 1)
             {
                 return "";
@@ -363,11 +405,18 @@ public sealed class PropertyAccessorGenerator : IIncrementalGenerator
         return accessModifier != PropertyAccessModifier.Default ? accessModifier : defaultValue;
     }
 
-    private static string GetPrefix(object? value, string defaultValue = "(_|m_)")
+    private static Regex? GetPrefix(object? value, Regex? defaultValue = null)
     {
-        return value is string stringValue && !string.IsNullOrWhiteSpace(stringValue)
-            ? stringValue
-            : defaultValue;
+        try
+        {
+            return value is string stringValue && !stringValue.AsSpan().Trim().IsEmpty
+                ? new Regex($"{(stringValue[0] == '^' ? "" : "^")}{stringValue}")
+                : defaultValue ?? DefaultRegex;
+        }
+        catch
+        {
+            return null;
+        }
     }
 
     private static PropertyNamingRule GetNamingRule(
@@ -388,9 +437,9 @@ public sealed class PropertyAccessorGenerator : IIncrementalGenerator
     #region IIncrementalGenerator Interface
     public void Initialize(IncrementalGeneratorInitializationContext context)
     {
-        var uniqueTypeSymbols = new HashSet<INamedTypeSymbol>(SymbolEqualityComparer.Default);
+        var visitedTypes = new HashSet<INamedTypeSymbol>(SymbolEqualityComparer.Default);
 
-        IncrementalValuesProvider<TypeContext> valuesProvider = context
+        IncrementalValuesProvider<(TypeContext?, ImmutableArray<Diagnostic>)> valuesProvider = context
             .SyntaxProvider
             .CreateSyntaxProvider(
                 predicate: static (syntaxNode, _) => syntaxNode
@@ -402,10 +451,12 @@ public sealed class PropertyAccessorGenerator : IIncrementalGenerator
                     },
                 transform: (generatorSyntaxContext, _) =>
                 {
+                    var diagnosticsBuilder = ImmutableArray.CreateBuilder<Diagnostic>();
+
                     var semanticModel = generatorSyntaxContext.SemanticModel;
                     if (semanticModel.GetDeclaredSymbol(generatorSyntaxContext.Node) is not INamedTypeSymbol typeSymbol)
                     {
-                        return null;
+                        return (null, diagnosticsBuilder.ToImmutable());
                     }
 
                     var attributeSymbol = typeSymbol
@@ -416,33 +467,59 @@ public sealed class PropertyAccessorGenerator : IIncrementalGenerator
                         });
                     if (attributeSymbol == null)
                     {
-                        return null;
+                        return (null, diagnosticsBuilder.ToImmutable());
                     }
 
-                    if (!uniqueTypeSymbols.Add(typeSymbol))
+                    if (!visitedTypes.Add(typeSymbol))
                     {
-                        return null;
+                        return (null, diagnosticsBuilder.ToImmutable());
                     }
 
-                    return new TypeContext(
-                        Symbol: typeSymbol,
-                        AccessModifier: GetAccessModifier(attributeSymbol.ConstructorArguments[0].Value),
-                        Prefix: GetPrefix(attributeSymbol.ConstructorArguments[1].Value),
-                        NamingRule: GetNamingRule(attributeSymbol.ConstructorArguments[2].Value)
+                    var prefixArgument = attributeSymbol.ConstructorArguments[1].Value;
+                    var typeLevelPrefix = GetPrefix(prefixArgument);
+
+                    if (typeLevelPrefix == null)
+                    {
+                        diagnosticsBuilder.Add(Diagnostic.Create(
+                            descriptor: InvalidPrefixPatternRule,
+                            location: attributeSymbol.ApplicationSyntaxReference?.GetSyntax().GetLocation(),
+                            messageArgs: [prefixArgument]
+                        ));
+
+                        return (null, diagnosticsBuilder.ToImmutable());
+                    }
+
+                    return (
+                        new TypeContext(
+                            Symbol: typeSymbol,
+                            AccessModifier: GetAccessModifier(attributeSymbol.ConstructorArguments[0].Value),
+                            Prefix: typeLevelPrefix,
+                            NamingRule: GetNamingRule(attributeSymbol.ConstructorArguments[2].Value)
+                        ),
+                        diagnosticsBuilder.ToImmutable()
                     );
                 }
-            )
-            .Where(typeContext => typeContext != null)!;
+            );
 
         context.RegisterSourceOutput(valuesProvider.Collect(), (sourceProductionContext, typeContexts) =>
         {
-            foreach (var typeContext in typeContexts)
+            foreach (var (typeContext, typeDiagnostics) in typeContexts)
             {
+                foreach (var diagnostic in typeDiagnostics)
+                {
+                    sourceProductionContext.ReportDiagnostic(diagnostic);
+                }
+
+                if (typeContext == null)
+                {
+                    continue;
+                }
+
                 var builder = ImmutableArray.CreateBuilder<string>();
 
-                foreach (var (fieldContext, diagnostics) in GetFieldContexts(typeContext))
+                foreach (var (fieldContext, fieldDiagnostics) in GetFieldContexts(typeContext))
                 {
-                    foreach (var diagnostic in diagnostics)
+                    foreach (var diagnostic in fieldDiagnostics)
                     {
                         sourceProductionContext.ReportDiagnostic(diagnostic);
                     }

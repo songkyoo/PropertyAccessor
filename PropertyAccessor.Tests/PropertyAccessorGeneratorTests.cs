@@ -7,7 +7,38 @@ namespace Macaron.PropertyAccessor.Tests;
 [TestFixture]
 public class PropertyAccessorGeneratorTests
 {
-    private static void Assert(string sourceCode, string expected)
+    private static void AssertGeneratedCode(
+        string sourceCode,
+        string expected,
+        out ImmutableArray<Diagnostic> diagnostics
+        )
+    {
+        (diagnostics, var generatedCode) = CompileAndGetResults(sourceCode);
+
+        foreach (var diagnostic in diagnostics)
+        {
+            Console.WriteLine(diagnostic);
+        }
+
+        Assert.That(generatedCode, Is.EqualTo(expected));
+    }
+
+    private static void AssertGeneratedCode(
+        string sourceCode,
+        string expected
+    )
+    {
+        var (diagnostics, generatedCode) = CompileAndGetResults(sourceCode);
+
+        foreach (var diagnostic in diagnostics)
+        {
+            Console.WriteLine(diagnostic);
+        }
+
+        Assert.That(generatedCode, Is.EqualTo(expected));
+    }
+
+    private static (ImmutableArray<Diagnostic> diagnostics, string generatedCode) CompileAndGetResults(string sourceCode)
     {
         var attributeAssembly = typeof(SetterAttribute).Assembly;
         var references = AppDomain
@@ -30,30 +61,24 @@ public class PropertyAccessorGeneratorTests
             )
         );
 
-        foreach (var diagnostic in compilation.GetDiagnostics())
-        {
-            Console.WriteLine(diagnostic);
-        }
-
         var generator = new PropertyAccessorGenerator();
         var driver = CSharpGeneratorDriver.Create(generator);
 
         var result = driver.RunGenerators(compilation).GetRunResult().Results.Single();
         var generatedSources = result.GeneratedSources;
-        var actual = generatedSources.Length > 0 ? generatedSources[0].SourceText.ToString() : "";
+        var generatedCode = generatedSources.Length > 0 ? generatedSources[0].SourceText.ToString() : "";
 
-        foreach (var diagnostic in result.Diagnostics)
-        {
-            Console.WriteLine(diagnostic);
-        }
+        var allDiagnostics = compilation.GetDiagnostics()
+            .Concat(result.Diagnostics)
+            .ToImmutableArray();
 
-        NUnit.Framework.Assert.That(actual, Is.EqualTo(expected));
+        return (allDiagnostics, generatedCode);
     }
 
     [Test]
-    public void ShouldNotGenerateProperty_WhenAutoPropertyAttributeIsMissing()
+    public void Should_NotGenerateProperty_When_ClassIsNotMarkedWithAutoProperty()
     {
-        Assert(
+        AssertGeneratedCode(
             sourceCode:
             """
             namespace Macaron.PropertyAccessor.Tests;
@@ -69,9 +94,9 @@ public class PropertyAccessorGeneratorTests
     }
 
     [Test]
-    public void ShouldGenerateGetter_WhenGetterAttributeIsPresentOnField()
+    public void Should_GenerateGetter_When_FieldIsMarkedWithGetterAttribute()
     {
-        Assert(
+        AssertGeneratedCode(
             sourceCode:
             """
             namespace Macaron.PropertyAccessor.Tests;
@@ -122,9 +147,9 @@ public class PropertyAccessorGeneratorTests
     }
 
     [Test]
-    public void ShouldGenerateSetter_WhenSetterAttributeIsPresentOnField()
+    public void Should_GenerateSetter_When_FieldIsMarkedWithSetterAttribute()
     {
-        Assert(
+        AssertGeneratedCode(
             sourceCode:
             """
             namespace Macaron.PropertyAccessor.Tests;
@@ -175,9 +200,9 @@ public class PropertyAccessorGeneratorTests
     }
 
     [Test]
-    public void ShouldGenerateGetterAndSetter_WhenBothAttributesArePresentOnField()
+    public void Should_GenerateGetterAndSetter_When_FieldHasGetterAndSetterAttributes()
     {
-        Assert(
+        AssertGeneratedCode(
             sourceCode:
             """
             using System.Collections.Generic;
@@ -228,9 +253,9 @@ public class PropertyAccessorGeneratorTests
     }
 
     [Test]
-    public void ShouldNotGenerateSetter_WhenFieldIsReadOnly()
+    public void Should_NotGenerateSetter_When_FieldIsReadOnly()
     {
-        Assert(
+        AssertGeneratedCode(
             sourceCode:
             """
             namespace Macaron.PropertyAccessor.Tests;
@@ -263,9 +288,9 @@ public class PropertyAccessorGeneratorTests
     }
 
     [Test]
-    public void ShouldGenerateAccessors_WithCustomAccessModifierPrefixAndNamingRule()
+    public void Should_GenerateAccessors_Using_CustomAccessModifierPrefixAndNamingRule()
     {
-        Assert(
+        AssertGeneratedCode(
             sourceCode:
             """
             namespace Macaron.PropertyAccessor.Tests;
@@ -298,9 +323,9 @@ public class PropertyAccessorGeneratorTests
     }
 
     [Test]
-    public void ShouldOverrideClassLevelSettings_WhenAutoPropertyAttributeIsPresentOnField()
+    public void Should_OverrideClassLevelSettings_With_FieldLevelAutoPropertySettings()
     {
-        Assert(
+        AssertGeneratedCode(
             sourceCode:
             """
             namespace Macaron.PropertyAccessor.Tests;
@@ -350,9 +375,9 @@ public class PropertyAccessorGeneratorTests
     }
 
     [Test]
-    public void ShouldGenerateGetter_WhenFieldTypeIsIReadOnlyProperty()
+    public void Should_GenerateGetter_When_FieldTypeIsIReadOnlyProperty()
     {
-        Assert(
+        AssertGeneratedCode(
             sourceCode:
             """
             namespace Macaron.PropertyAccessor.Tests;
@@ -390,9 +415,9 @@ public class PropertyAccessorGeneratorTests
     }
 
     [Test]
-    public void ShouldGenerateGetterAndSetter_WhenFieldTypeIsIReadWriteProperty()
+    public void Should_GenerateGetterAndSetter_When_FieldTypeIsIReadWriteProperty()
     {
-        Assert(
+        AssertGeneratedCode(
             sourceCode:
             """
             namespace Macaron.PropertyAccessor.Tests;
@@ -432,9 +457,9 @@ public class PropertyAccessorGeneratorTests
     }
 
     [Test]
-    public void ShouldNotGenerateProperty_WhenFieldTypeIsIReadOnlyPropertyWithoutReadonlyModifier()
+    public void Should_NotGenerateProperty_When_IReadOnlyPropertyFieldIsNotReadonly()
     {
-        Assert(
+        AssertGeneratedCode(
             sourceCode:
             """
             namespace Macaron.PropertyAccessor.Tests;
@@ -467,9 +492,9 @@ public class PropertyAccessorGeneratorTests
     }
 
     [Test]
-    public void ShouldNotGenerateProperty_WhenFieldTypeIsIReadWritePropertyWithoutReadonlyModifier()
+    public void Should_NotGenerateProperty_When_IReadWritePropertyFieldIsNotReadonly()
     {
-        Assert(
+        AssertGeneratedCode(
             sourceCode:
             """
             namespace Macaron.PropertyAccessor.Tests;
@@ -504,9 +529,9 @@ public class PropertyAccessorGeneratorTests
     }
 
     [Test]
-    public void ShouldNotGenerateProperty_WhenGeneratedPropertyNameIsEmpty()
+    public void Should_ReportDiagnostic_When_GeneratedPropertyNameIsEmpty()
     {
-        Assert(
+        AssertGeneratedCode(
             sourceCode:
             """
             namespace Macaron.PropertyAccessor.Tests;
@@ -517,7 +542,265 @@ public class PropertyAccessorGeneratorTests
                 private readonly int _ = null!;
             }
             """,
-            expected: ""
+            expected: "",
+            out var diagnostics
+        );
+
+        Assert.That(diagnostics, Has.Some.Matches<Diagnostic>(diagnostic => diagnostic.Id == "PA0005"));
+    }
+
+    [Test]
+    public void Should_ReportDiagnostic_When_GeneratedPropertyNameConflictsWithFieldName()
+    {
+        AssertGeneratedCode(
+            sourceCode:
+            """
+            namespace Macaron.PropertyAccessor.Tests;
+
+            [AutoProperty]
+            public partial class Foo
+            {
+                private readonly int Answer = null!;
+            }
+            """,
+            expected: "",
+            out var diagnostics
+        );
+
+        Assert.That(diagnostics, Has.Some.Matches<Diagnostic>(diagnostic => diagnostic.Id == "PA0006"));
+    }
+
+    [Test]
+    public void Should_ReportError_When_ClassLevelPrefixRegexIsInvalid()
+    {
+         AssertGeneratedCode(
+            sourceCode:
+            """
+            namespace Macaron.PropertyAccessor.Tests;
+
+            [AutoProperty(prefix: "[invalid")]
+            public partial class Foo
+            {
+                [Getter]
+                private int _answer = 42;
+            }
+            """,
+            expected: "",
+            out var diagnostics
+        );
+
+        Assert.That(diagnostics, Has.Some.Matches<Diagnostic>(diagnostic =>
+            diagnostic.Id == "PA0007" &&
+            diagnostic.GetMessage().Contains("[invalid")
+        ));
+    }
+
+    [Test]
+    public void Should_ReportError_When_FieldLevelPrefixRegexIsInvalid()
+    {
+        AssertGeneratedCode(
+            sourceCode:
+            """
+            namespace Macaron.PropertyAccessor.Tests;
+
+            [AutoProperty]
+            public partial class Foo
+            {
+                [AutoProperty(prefix: "*+invalid"), Getter]
+                private int _answer = 42;
+            }
+            """,
+            expected: "",
+            out var diagnostics
+        );
+
+        Assert.That(diagnostics, Has.Some.Matches<Diagnostic>(diagnostic =>
+            diagnostic.Id == "PA0007" &&
+            diagnostic.GetMessage().Contains("*+invalid")
+        ));
+    }
+
+    [Test]
+    public void Should_UseDefaultPrefix_When_ClassLevelPrefixIsEmpty()
+    {
+        AssertGeneratedCode(sourceCode:
+            """
+            namespace Macaron.PropertyAccessor.Tests;
+
+            [AutoProperty(prefix: "")]
+            public partial class Foo
+            {
+                [Getter]
+                private int _answer = 42;
+            }
+            """,
+            expected:
+
+            """
+            // <auto-generated />
+            #nullable enable
+
+            namespace Macaron.PropertyAccessor.Tests
+            {
+                partial class Foo
+                {
+                    public int Answer
+                    {
+                        get => _answer;
+                    }
+                }
+            }
+
+            """,
+            out var diagnostics
+        );
+
+        Assert.That(diagnostics, Has.None.Matches<Diagnostic>(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error));
+    }
+
+    [Test]
+    public void Should_GenerateAccessorsCorrectly_When_UsingComplexPrefixRegexPatterns()
+    {
+        AssertGeneratedCode(
+            sourceCode:
+            """
+            namespace Macaron.PropertyAccessor.Tests;
+
+            [AutoProperty(prefix: @"^(m_|_|s_)")]
+            public partial class Foo
+            {
+                [Getter]
+                private int m_answer1 = 42;
+
+                [Getter]
+                private int _answer2 = 42;
+
+                [Getter]
+                private static int s_answer3 = 42;
+
+                [Getter]
+                private int normalField = 42;
+            }
+            """,
+            expected:
+            """
+            // <auto-generated />
+            #nullable enable
+
+            namespace Macaron.PropertyAccessor.Tests
+            {
+                partial class Foo
+                {
+                    public int Answer1
+                    {
+                        get => m_answer1;
+                    }
+
+                    public int Answer2
+                    {
+                        get => _answer2;
+                    }
+
+                    public int Answer3
+                    {
+                        get => s_answer3;
+                    }
+
+                    public int NormalField
+                    {
+                        get => normalField;
+                    }
+                }
+            }
+
+            """,
+            out var diagnostics
+        );
+
+        Assert.That(diagnostics, Has.None.Matches<Diagnostic>(diagnostic => diagnostic.Id == "PA0007"));
+    }
+
+    [Test]
+    public void Should_NotApplyAutoProperty_To_NestedTypes_ByDefault()
+    {
+        AssertGeneratedCode(
+            sourceCode:
+            """
+            namespace Macaron.PropertyAccessor.Tests;
+
+            [AutoProperty]
+            public partial class Outer
+            {
+                [Getter]
+                private int _outerField = 1;
+
+                public partial class Inner
+                {
+                    [Getter]
+                    private int _innerField = 2;
+                }
+            }
+            """,
+            expected:
+            """
+            // <auto-generated />
+            #nullable enable
+
+            namespace Macaron.PropertyAccessor.Tests
+            {
+                partial class Outer
+                {
+                    public int OuterField
+                    {
+                        get => _outerField;
+                    }
+                }
+            }
+
+            """
+        );
+    }
+
+    [Test]
+    public void Should_ApplyAutoProperty_When_NestedTypeIsExplicitlyMarked()
+    {
+        AssertGeneratedCode(
+            sourceCode:
+            """
+            namespace Macaron.PropertyAccessor.Tests;
+
+            public partial class Outer
+            {
+                private int _outerField = 1;
+
+                [AutoProperty]
+                public partial class Inner
+                {
+                    [Getter]
+                    private int _innerField = 2;
+                }
+            }
+            """,
+            expected:
+            """
+            // <auto-generated />
+            #nullable enable
+
+            namespace Macaron.PropertyAccessor.Tests
+            {
+                partial class Outer
+                {
+                    partial class Inner
+                    {
+                        public int InnerField
+                        {
+                            get => _innerField;
+                        }
+                    }
+                }
+            }
+
+            """
         );
     }
 }
