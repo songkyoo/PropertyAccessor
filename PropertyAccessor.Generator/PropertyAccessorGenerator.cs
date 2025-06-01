@@ -407,7 +407,9 @@ public sealed class PropertyAccessorGenerator : IIncrementalGenerator
         }
 
         var accessModifier = (PropertyAccessModifier)value;
-        return accessModifier != PropertyAccessModifier.Default ? accessModifier : defaultValue;
+        var isDefined = Enum.IsDefined(typeof(PropertyAccessModifier), accessModifier);
+
+        return isDefined && accessModifier != PropertyAccessModifier.Default ? accessModifier : defaultValue;
     }
 
     private static Regex? GetPrefix(object? value, Regex? defaultValue = null)
@@ -435,7 +437,9 @@ public sealed class PropertyAccessorGenerator : IIncrementalGenerator
         }
 
         var namingRule = (PropertyNamingRule)value;
-        return namingRule != PropertyNamingRule.Default ? namingRule : defaultValue;
+        var isDefined = Enum.IsDefined(typeof(PropertyNamingRule), namingRule);
+
+        return isDefined && namingRule != PropertyNamingRule.Default ? namingRule : defaultValue;
     }
 
     private static string GetEscapedKeyword(string keyword)
