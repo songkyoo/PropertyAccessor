@@ -42,57 +42,57 @@ public sealed class PropertyAccessorGenerator : IIncrementalGenerator
 
     #region Static
     private static readonly DiagnosticDescriptor ReadonlyFieldWithSetterAttributeRule = new(
-        id: "PA0001",
+        id: "MAPA0001",
         title: "SetterAttribute cannot be applied to readonly fields",
-        messageFormat: "Field '{0}' is marked readonly but has Setter attribute",
+        messageFormat: "Field '{0}' is marked readonly but has the Setter attribute.",
         category: "Usage",
         DiagnosticSeverity.Error,
         isEnabledByDefault: true
     );
     private static readonly DiagnosticDescriptor DelegatedPropertyMustBeReadonlyRule = new(
-        id: "PA0002",
+        id: "MAPA0002",
         title: "Delegated property fields must be readonly",
-        messageFormat: "Field '{0}' must be marked readonly",
+        messageFormat: "Field '{0}' must be marked readonly.",
         category: "Usage",
         DiagnosticSeverity.Error,
         isEnabledByDefault: true
     );
     private static readonly DiagnosticDescriptor GetterRedundantForDelegatedPropertyRule = new(
-        id: "PA0003",
+        id: "MAPA0003",
         title: "Getter is not allowed for delegated properties",
-        messageFormat: "Getter on field '{0}' is not allowed",
+        messageFormat: "Field '{0}' must not have a getter.",
         category: "Usage",
         DiagnosticSeverity.Error,
         isEnabledByDefault: true
     );
     private static readonly DiagnosticDescriptor SetterRedundantForDelegatedPropertyRule = new(
-        id: "PA0004",
+        id: "MAPA0004",
         title: "Setter is not allowed for delegated properties",
-        messageFormat: "Setter on field '{0}' is not allowed",
+        messageFormat: "Field '{0}' must not have a setter.",
         category: "Usage",
         DiagnosticSeverity.Error,
         isEnabledByDefault: true
     );
     private static readonly DiagnosticDescriptor InvalidPropertyNameAfterPrefixRemovalRule = new(
-        id: "PA0005",
+        id: "MAPA0005",
         title: "Cannot generate property name after prefix removal",
-        messageFormat: "Field '{0}' with prefix pattern '{1}' results in an empty property name",
+        messageFormat: "Field '{0}' with prefix pattern '{1}' results in an empty property name.",
         category: "Naming",
         DiagnosticSeverity.Error,
         isEnabledByDefault: true
     );
     private static readonly DiagnosticDescriptor PropertyNameSameAsFieldNameRule = new(
-        id: "PA0006",
+        id: "MAPA0006",
         title: "Generated property name is same as field name",
-        messageFormat: "Field '{0}' with prefix pattern '{1}' results in property name '{2}' which is same as field name",
+        messageFormat: "Field '{0}' with prefix pattern '{1}' results in property name '{2}', which is the same as the field name.",
         category: "Naming",
         DiagnosticSeverity.Warning,
         isEnabledByDefault: true
     );
     private static readonly DiagnosticDescriptor InvalidPrefixPatternRule = new(
-        id: "PA0007",
+        id: "MAPA0007",
         title: "Invalid prefix pattern",
-        messageFormat: "Prefix pattern '{0}' is not a valid regular expression",
+        messageFormat: "Prefix pattern '{0}' is not a valid regular expression.",
         category: "Usage",
         DiagnosticSeverity.Error,
         isEnabledByDefault: true
