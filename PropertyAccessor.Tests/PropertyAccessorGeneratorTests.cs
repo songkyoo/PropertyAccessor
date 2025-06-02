@@ -20,7 +20,7 @@ public class PropertyAccessorGeneratorTests
             Console.WriteLine(diagnostic);
         }
 
-        Assert.That(generatedCode, Is.EqualTo(expected));
+        Assert.That(generatedCode.ReplaceLineEndings(), Is.EqualTo(expected.ReplaceLineEndings()));
     }
 
     private static void AssertGeneratedCode(
@@ -35,7 +35,7 @@ public class PropertyAccessorGeneratorTests
             Console.WriteLine(diagnostic);
         }
 
-        Assert.That(generatedCode, Is.EqualTo(expected));
+        Assert.That(generatedCode.ReplaceLineEndings(), Is.EqualTo(expected.ReplaceLineEndings()));
     }
 
     private static (ImmutableArray<Diagnostic> diagnostics, string generatedCode) CompileAndGetResults(string sourceCode)
@@ -546,7 +546,7 @@ public class PropertyAccessorGeneratorTests
             out var diagnostics
         );
 
-        Assert.That(diagnostics, Has.Some.Matches<Diagnostic>(diagnostic => diagnostic.Id == "PA0005"));
+        Assert.That(diagnostics, Has.Some.Matches<Diagnostic>(diagnostic => diagnostic.Id == "MAPA0005"));
     }
 
     [Test]
@@ -567,7 +567,7 @@ public class PropertyAccessorGeneratorTests
             out var diagnostics
         );
 
-        Assert.That(diagnostics, Has.Some.Matches<Diagnostic>(diagnostic => diagnostic.Id == "PA0006"));
+        Assert.That(diagnostics, Has.Some.Matches<Diagnostic>(diagnostic => diagnostic.Id == "MAPA0006"));
     }
 
     [Test]
@@ -590,7 +590,7 @@ public class PropertyAccessorGeneratorTests
         );
 
         Assert.That(diagnostics, Has.Some.Matches<Diagnostic>(diagnostic =>
-            diagnostic.Id == "PA0007" &&
+            diagnostic.Id == "MAPA0007" &&
             diagnostic.GetMessage().Contains("[invalid")
         ));
     }
@@ -615,7 +615,7 @@ public class PropertyAccessorGeneratorTests
         );
 
         Assert.That(diagnostics, Has.Some.Matches<Diagnostic>(diagnostic =>
-            diagnostic.Id == "PA0007" &&
+            diagnostic.Id == "MAPA0007" &&
             diagnostic.GetMessage().Contains("*+invalid")
         ));
     }
