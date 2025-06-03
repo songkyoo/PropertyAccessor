@@ -36,21 +36,14 @@ public sealed class PropertyAccessorGenerator : IIncrementalGenerator
         string FieldName,
         bool HasGetter,
         bool HasSetter,
+        bool IsInitSetter,
         bool IsDelegated
     );
     #endregion
 
     #region Static
-    private static readonly DiagnosticDescriptor ReadonlyFieldWithSetterAttributeRule = new(
-        id: "MAPA0001",
-        title: "SetterAttribute cannot be applied to readonly fields",
-        messageFormat: "Field '{0}' is marked readonly but has the Setter attribute.",
-        category: "Usage",
-        DiagnosticSeverity.Error,
-        isEnabledByDefault: true
-    );
     private static readonly DiagnosticDescriptor DelegatedPropertyMustBeReadonlyRule = new(
-        id: "MAPA0002",
+        id: "MAPA0001",
         title: "Delegated property fields must be readonly",
         messageFormat: "Field '{0}' must be marked readonly.",
         category: "Usage",
@@ -58,7 +51,7 @@ public sealed class PropertyAccessorGenerator : IIncrementalGenerator
         isEnabledByDefault: true
     );
     private static readonly DiagnosticDescriptor GetterRedundantForDelegatedPropertyRule = new(
-        id: "MAPA0003",
+        id: "MAPA0002",
         title: "Getter is not allowed for delegated properties",
         messageFormat: "Field '{0}' must not have a getter.",
         category: "Usage",
@@ -66,7 +59,7 @@ public sealed class PropertyAccessorGenerator : IIncrementalGenerator
         isEnabledByDefault: true
     );
     private static readonly DiagnosticDescriptor SetterRedundantForDelegatedPropertyRule = new(
-        id: "MAPA0004",
+        id: "MAPA0003",
         title: "Setter is not allowed for delegated properties",
         messageFormat: "Field '{0}' must not have a setter.",
         category: "Usage",
@@ -74,7 +67,7 @@ public sealed class PropertyAccessorGenerator : IIncrementalGenerator
         isEnabledByDefault: true
     );
     private static readonly DiagnosticDescriptor InvalidPropertyNameAfterPrefixRemovalRule = new(
-        id: "MAPA0005",
+        id: "MAPA0004",
         title: "Cannot generate property name after prefix removal",
         messageFormat: "Field '{0}' with prefix pattern '{1}' results in an empty property name.",
         category: "Naming",
@@ -82,7 +75,7 @@ public sealed class PropertyAccessorGenerator : IIncrementalGenerator
         isEnabledByDefault: true
     );
     private static readonly DiagnosticDescriptor PropertyNameSameAsFieldNameRule = new(
-        id: "MAPA0006",
+        id: "MAPA0005",
         title: "Generated property name is same as field name",
         messageFormat: "Field '{0}' with prefix pattern '{1}' results in property name '{2}', which is the same as the field name.",
         category: "Naming",
@@ -90,7 +83,7 @@ public sealed class PropertyAccessorGenerator : IIncrementalGenerator
         isEnabledByDefault: true
     );
     private static readonly DiagnosticDescriptor InvalidPrefixPatternRule = new(
-        id: "MAPA0007",
+        id: "MAPA0006",
         title: "Invalid prefix pattern",
         messageFormat: "Prefix pattern '{0}' is not a valid regular expression.",
         category: "Usage",
@@ -273,19 +266,6 @@ public sealed class PropertyAccessorGenerator : IIncrementalGenerator
                 isDelegatedProperty = true;
             }
         }
-        else
-        {
-            if (fieldSymbol.IsReadOnly && hasSetter)
-            {
-                diagnosticsBuilder.Add(Diagnostic.Create(
-                    descriptor: ReadonlyFieldWithSetterAttributeRule,
-                    location: fieldSymbol.Locations.FirstOrDefault(),
-                    messageArgs: [fieldName]
-                ));
-
-                hasSetter = false;
-            }
-        }
 
         if (hasGetter || hasSetter)
         {
@@ -300,6 +280,7 @@ public sealed class PropertyAccessorGenerator : IIncrementalGenerator
                     FieldName: fieldName,
                     HasGetter: hasGetter,
                     HasSetter: hasSetter,
+                    IsInitSetter: !isDelegatedProperty && fieldSymbol.IsReadOnly,
                     IsDelegated: isDelegatedProperty
                 ),
                 diagnosticsBuilder.ToImmutable()
@@ -348,6 +329,7 @@ public sealed class PropertyAccessorGenerator : IIncrementalGenerator
             fieldName,
             hasGetter,
             hasSetter,
+            isInitSetter,
             isDelegatedProperty
         ) = propertyContext;
 
@@ -371,7 +353,7 @@ public sealed class PropertyAccessorGenerator : IIncrementalGenerator
 
         if (hasSetter)
         {
-            builder.Add($"{Space}set => {escapedFieldName}{(isDelegatedProperty ? ".Set(this, value)" : " = value")};");
+            builder.Add($"{Space}{(isInitSetter ? "init" : "set")} => {escapedFieldName}{(isDelegatedProperty ? ".Set(this, value)" : " = value")};");
         }
 
         builder.Add($"}}");
