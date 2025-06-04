@@ -15,11 +15,6 @@ public class PropertyAccessorGeneratorTests
     {
         (diagnostics, var generatedCode) = CompileAndGetResults(sourceCode);
 
-        foreach (var diagnostic in diagnostics)
-        {
-            Console.WriteLine(diagnostic);
-        }
-
         Assert.That(generatedCode.ReplaceLineEndings(), Is.EqualTo(expected.ReplaceLineEndings()));
     }
 
@@ -28,12 +23,7 @@ public class PropertyAccessorGeneratorTests
         string expected
     )
     {
-        var (diagnostics, generatedCode) = CompileAndGetResults(sourceCode);
-
-        foreach (var diagnostic in diagnostics)
-        {
-            Console.WriteLine(diagnostic);
-        }
+        var (_, generatedCode) = CompileAndGetResults(sourceCode);
 
         Assert.That(generatedCode.ReplaceLineEndings(), Is.EqualTo(expected.ReplaceLineEndings()));
     }
