@@ -1,4 +1,4 @@
-﻿namespace Macaron.PropertyAccessor.Properties;
+﻿namespace Macaron.PropertyAccessor.Properties.Impl;
 
 public sealed class ReadOnlyProperty<T, TProperty>(Func<T, TProperty> getter) : IReadOnlyProperty<T, TProperty>
 {

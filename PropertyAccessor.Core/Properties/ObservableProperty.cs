@@ -1,4 +1,6 @@
-﻿namespace Macaron.PropertyAccessor.Properties;
+﻿using Macaron.PropertyAccessor.Properties.Impl;
+
+namespace Macaron.PropertyAccessor.Properties;
 
 public static class ObservableProperty
 {
