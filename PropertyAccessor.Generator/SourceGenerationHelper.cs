@@ -18,7 +18,7 @@ public static class SourceGenerationHelpers
         ImmutableArray<string> lines
     )
     {
-        if (lines.IsEmpty)
+        if (lines.IsDefaultOrEmpty)
         {
             return;
         }
@@ -134,7 +134,7 @@ public static class SourceGenerationHelpers
     {
         if (typeSymbol.IsRecord)
         {
-            return typeSymbol.TypeKind is TypeKind.Struct ? "record struct" : "record" ;
+            return typeSymbol.TypeKind is TypeKind.Struct ? "record struct" : "record";
         }
 
         return typeSymbol.TypeKind switch

@@ -11,7 +11,7 @@ public class PropertyAccessorGeneratorTests
         string sourceCode,
         string expected,
         out ImmutableArray<Diagnostic> diagnostics
-        )
+    )
     {
         (diagnostics, var generatedCode) = CompileAndGetResults(sourceCode);
 
