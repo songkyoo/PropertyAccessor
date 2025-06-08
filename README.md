@@ -1,10 +1,21 @@
 # Property Accessor
 
-필드에 어트리뷰트를 추가하거나 지정된 인터페이스를 필드로 선언하는 것으로 프로퍼티를 자동으로 생성하는 소스 제네레이터입니다.
+필드에 어트리뷰트를 적용하거나 지정된 인터페이스를 필드로 선언하는 것으로 프로퍼티를 자동으로 생성하는 C# 소스 제네레이터입니다.
+
+## 빌드하기
+
+다음과 같은 순서로 명령을 수행하여 NuGet 패키지를 생성할 수 있습니다.
+
+```shell
+dotnet build -c Release
+dotnet pack ./PropertyAccessor/PropertyAccessor.csproj -c Release
+```
+
+`./PropertyAccessor/bin/Release/` 폴더에 `nupkg` 확장자를 가지는 패키지가 생성됩니다.
 
 ## 사용법
 
-프로퍼티를 자동으로 구현하고자 하는 타입은 `AutoProperty` 어트리뷰트를 선언하고 `partial` 한정자를 추가해야 합니다.
+프로퍼티를 자동으로 구현하고자 하는 타입은 `AutoProperty` 어트리뷰트를 적용하고 `partial` 한정자를 추가해야 합니다.
 
 ```csharp
 using Macaron.PropertyAccessor;
@@ -31,11 +42,11 @@ public partial class Foo
 }
 ```
 
-위와 같은 코드가 있는 경우 `_baz`에 대한 프로퍼티는 생성되지 않습니다. `_baz`에 대한 프로퍼티를 생성하려면 `Bar` 클래스 선언에 `AutoProperty` 어트리뷰트를 선언해야 합니다.
+위와 같은 코드가 있는 경우 `_baz`에 대한 프로퍼티는 생성되지 않습니다. `_baz`에 대한 프로퍼티를 생성하려면 `Bar` 클래스 선언에 `AutoProperty` 어트리뷰트를 적용해야 합니다.
 
 ### Getter, Setter 어트리뷰트를 사용하기
 
-필드에 `Getter`와 `Setter` 어트리뷰트를 선언함으로써 프로퍼티를 추가할 수 있습니다.
+필드에 `Getter`와 `Setter` 어트리뷰트를 적용함으로써 프로퍼티를 추가할 수 있습니다.
 
 ```csharp
 using Macaron.PropertyAccessor;
@@ -105,7 +116,7 @@ public partial class Foo
 }
 ```
 
-> :warning: 인터페이스를 구현한 타입이 아니라 인터페이스를 선언해야 합니다.
+> :warning: 인터페이스를 구현한 타입이 아니라 인터페이스를 사용해야 합니다.
 
 위 코드는 다음과 같은 코드를 생성합니다.
 
@@ -339,7 +350,7 @@ public partial class Foo
 
 #### 멤버에 AutoProperty 선언하기
 
-필드에도 `AutoProperty` 어트리뷰트를 선언할 수 있습니다. 이 경우 기본값은 타입에 선언된 `AutoProperty`의 옵션 값을 따릅니다.
+필드에도 `AutoProperty` 어트리뷰트를 적용할 수 있습니다. 이 경우 기본값은 타입에 적용된 `AutoProperty`의 옵션 값을 따릅니다.
 
 ```csharp
 using Macaron.PropertyAccessor;
@@ -347,7 +358,7 @@ using Macaron.PropertyAccessor;
 [AutoProperty(accessModifier: PropertyAccessModifier.Protected)]
 public partial class Foo
 {
-    // 지정하지 않은 accessModifier 옵션은 타입에 지정된 AutoProperty에서 지정된 값을 따릅니다.
+    // 지정하지 않은 accessModifier 옵션은 타입에 적용된 AutoProperty에서 지정된 값을 따릅니다.
     [AutoProperty(prefix:"f", namingRule: PropertyNamingRule.CamelCase), Getter]
     private string fName;
 }
