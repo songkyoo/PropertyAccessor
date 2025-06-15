@@ -536,7 +536,7 @@ public class PropertyAccessorGeneratorTests
             out var diagnostics
         );
 
-        Assert.That(diagnostics, Has.Some.Matches<Diagnostic>(diagnostic => diagnostic.Id == "MAPA0004"));
+        Assert.That(diagnostics, Has.Some.Matches<Diagnostic>(diagnostic => diagnostic.Id == "MPROP0004"));
     }
 
     [Test]
@@ -557,7 +557,7 @@ public class PropertyAccessorGeneratorTests
             out var diagnostics
         );
 
-        Assert.That(diagnostics, Has.Some.Matches<Diagnostic>(diagnostic => diagnostic.Id == "MAPA0005"));
+        Assert.That(diagnostics, Has.Some.Matches<Diagnostic>(diagnostic => diagnostic.Id == "MPROP0005"));
     }
 
     [Test]
@@ -580,7 +580,7 @@ public class PropertyAccessorGeneratorTests
         );
 
         Assert.That(diagnostics, Has.Some.Matches<Diagnostic>(diagnostic =>
-            diagnostic.Id == "MAPA0006" &&
+            diagnostic.Id == "MPROP0006" &&
             diagnostic.GetMessage().Contains("[invalid")
         ));
     }
@@ -605,7 +605,7 @@ public class PropertyAccessorGeneratorTests
         );
 
         Assert.That(diagnostics, Has.Some.Matches<Diagnostic>(diagnostic =>
-            diagnostic.Id == "MAPA0006" &&
+            diagnostic.Id == "MPROP0006" &&
             diagnostic.GetMessage().Contains("*+invalid")
         ));
     }

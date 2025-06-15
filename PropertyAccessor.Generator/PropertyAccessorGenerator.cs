@@ -43,49 +43,49 @@ public sealed class PropertyAccessorGenerator : IIncrementalGenerator
 
     #region Static
     private static readonly DiagnosticDescriptor DelegatedPropertyMustBeReadonlyRule = new(
-        id: "MAPA0001",
+        id: "MPROP0001",
         title: "Delegated property fields must be readonly",
-        messageFormat: "Field '{0}' must be marked readonly.",
+        messageFormat: "Field '{0}' must be marked readonly",
         category: "Usage",
         DiagnosticSeverity.Error,
         isEnabledByDefault: true
     );
     private static readonly DiagnosticDescriptor GetterRedundantForDelegatedPropertyRule = new(
-        id: "MAPA0002",
+        id: "MPROP0002",
         title: "Getter is not allowed for delegated properties",
-        messageFormat: "Field '{0}' must not have a getter.",
+        messageFormat: "Field '{0}' must not have a getter",
         category: "Usage",
         DiagnosticSeverity.Error,
         isEnabledByDefault: true
     );
     private static readonly DiagnosticDescriptor SetterRedundantForDelegatedPropertyRule = new(
-        id: "MAPA0003",
+        id: "MPROP0003",
         title: "Setter is not allowed for delegated properties",
-        messageFormat: "Field '{0}' must not have a setter.",
+        messageFormat: "Field '{0}' must not have a setter",
         category: "Usage",
         DiagnosticSeverity.Error,
         isEnabledByDefault: true
     );
     private static readonly DiagnosticDescriptor InvalidPropertyNameAfterPrefixRemovalRule = new(
-        id: "MAPA0004",
+        id: "MPROP0004",
         title: "Cannot generate property name after prefix removal",
-        messageFormat: "Field '{0}' with prefix pattern '{1}' results in an empty property name.",
+        messageFormat: "Field '{0}' with prefix pattern '{1}' results in an empty property name",
         category: "Naming",
         DiagnosticSeverity.Error,
         isEnabledByDefault: true
     );
     private static readonly DiagnosticDescriptor PropertyNameSameAsFieldNameRule = new(
-        id: "MAPA0005",
+        id: "MPROP0005",
         title: "Generated property name is same as field name",
-        messageFormat: "Field '{0}' with prefix pattern '{1}' results in property name '{2}', which is the same as the field name.",
+        messageFormat: "Field '{0}' with prefix pattern '{1}' results in property name '{2}', which is the same as the field name",
         category: "Naming",
         DiagnosticSeverity.Warning,
         isEnabledByDefault: true
     );
     private static readonly DiagnosticDescriptor InvalidPrefixPatternRule = new(
-        id: "MAPA0006",
+        id: "MPROP0006",
         title: "Invalid prefix pattern",
-        messageFormat: "Prefix pattern '{0}' is not a valid regular expression.",
+        messageFormat: "Prefix pattern '{0}' is not a valid regular expression",
         category: "Usage",
         DiagnosticSeverity.Error,
         isEnabledByDefault: true
