@@ -2,6 +2,7 @@
 
   <PropertyGroup>
     <AnalyzerLanguage>cs</AnalyzerLanguage>
+    <AssemblyName>Macaron.PropertyAccessor.Generator</AssemblyName>
     <DevelopmentDependency>true</DevelopmentDependency>
     <EnforceExtendedAnalyzerRules>true</EnforceExtendedAnalyzerRules>
     <ImplicitUsings>enable</ImplicitUsings>
@@ -17,7 +18,7 @@
   </PropertyGroup>
 
   <PropertyGroup>
-    <Version>1.0.2</Version>
+    <Version>1.0.3</Version>
   </PropertyGroup>
 
   <ItemGroup>

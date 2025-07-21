@@ -1,11 +1,8 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <ImplicitUsings>enable</ImplicitUsings>
     <IncludeBuildOutput>false</IncludeBuildOutput>
     <LangVersion>latest</LangVersion>
-    <Nullable>enable</Nullable>
-    <RootNamespace>Macaron.PropertyAccessor</RootNamespace>
     <TargetFramework>netstandard2.0</TargetFramework>
   </PropertyGroup>
 
@@ -15,7 +12,7 @@
     <PackageLicenseExpression>Unlicense</PackageLicenseExpression>
     <RepositoryType>git</RepositoryType>
     <RepositoryUrl>https://github.com/songkyoo/PropertyAccessor</RepositoryUrl>
-    <Version>1.0.2</Version>
+    <Version>1.0.3</Version>
   </PropertyGroup>
   
   <ItemGroup>
@@ -24,9 +21,9 @@
   </ItemGroup>
 
   <ItemGroup>
-    <None Include="..\PropertyAccessor.Core\bin\$(Configuration)\netstandard2.0\PropertyAccessor.Core.dll" Pack="true" PackagePath="lib/netstandard2.0" />
-    <None Include="..\PropertyAccessor.Core\bin\$(Configuration)\netstandard2.0\PropertyAccessor.Core.dll" Pack="true" PackagePath="analyzers/dotnet/cs/" />
-    <None Include="..\PropertyAccessor.Generator\bin\$(Configuration)\netstandard2.0\PropertyAccessor.Generator.dll" Pack="true" PackagePath="analyzers/dotnet/cs/" />
+    <None Include="..\PropertyAccessor.Core\bin\$(Configuration)\netstandard2.0\Macaron.PropertyAccessor.Core.dll" Pack="true" PackagePath="lib/netstandard2.0" />
+    <None Include="..\PropertyAccessor.Core\bin\$(Configuration)\netstandard2.0\Macaron.PropertyAccessor.Core.dll" Pack="true" PackagePath="analyzers/dotnet/cs/" />
+    <None Include="..\PropertyAccessor.Generator\bin\$(Configuration)\netstandard2.0\Macaron.PropertyAccessor.Generator.dll" Pack="true" PackagePath="analyzers/dotnet/cs/" />
   </ItemGroup>
 
 </Project>
