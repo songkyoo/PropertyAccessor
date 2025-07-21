@@ -343,7 +343,7 @@ public sealed class PropertyAccessorGenerator : IIncrementalGenerator
 
         var builder = ImmutableArray.CreateBuilder<string>();
 
-        builder.Add($"{GetAccessorModifier(accessModifier)} {typeSymbol.ToDisplayString(FullyQualifiedFormat)} {escapedPropertyName}");
+        builder.Add($"{GetAccessorModifier(accessModifier)} {typeSymbol.ToDisplayString(FullyQualifiedFormat)}{GetNullableAnnotationString(typeSymbol)} {escapedPropertyName}");
         builder.Add($"{{");
 
         if (hasGetter)
@@ -375,6 +375,11 @@ public sealed class PropertyAccessorGenerator : IIncrementalGenerator
                 _ => throw new InvalidOperationException($"Invalid access modifier: {accessModifier}")
             };
         }
+
+        static string GetNullableAnnotationString(ITypeSymbol typeSymbol) =>
+            typeSymbol.NullableAnnotation == NullableAnnotation.Annotated && !typeSymbol.ToDisplayString(FullyQualifiedFormat).EndsWith("?")
+                ? "?"
+                : "";
         #endregion
     }
 

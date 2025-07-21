@@ -104,6 +104,12 @@ public class PropertyAccessorGeneratorTests
 
                 [Getter]
                 public int answer3 = 42;
+
+                [Getter]
+                public int? answer4 = null;
+
+                [Getter]
+                public object? answer5 = null;
             }
             """,
             expected:
@@ -128,6 +134,16 @@ public class PropertyAccessorGeneratorTests
                     public int Answer3
                     {
                         get => answer3;
+                    }
+
+                    public int? Answer4
+                    {
+                        get => answer4;
+                    }
+
+                    public object? Answer5
+                    {
+                        get => answer5;
                     }
                 }
             }
@@ -157,6 +173,12 @@ public class PropertyAccessorGeneratorTests
 
                 [Setter]
                 public int answer3 = 42;
+
+                [Setter]
+                public int? answer4 = null;
+
+                [Setter]
+                public object? answer5 = null;
             }
             """,
             expected:
@@ -181,6 +203,16 @@ public class PropertyAccessorGeneratorTests
                     public int Answer3
                     {
                         set => answer3 = value;
+                    }
+
+                    public int? Answer4
+                    {
+                        set => answer4 = value;
+                    }
+
+                    public object? Answer5
+                    {
+                        set => answer5 = value;
                     }
                 }
             }
