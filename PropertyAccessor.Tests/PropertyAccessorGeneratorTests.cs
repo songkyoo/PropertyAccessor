@@ -91,6 +91,8 @@ public class PropertyAccessorGeneratorTests
             """
             namespace Macaron.PropertyAccessor.Tests;
 
+            public interface IBar<T> { }
+
             [AutoProperty]
             public partial class Foo
             {
@@ -110,6 +112,9 @@ public class PropertyAccessorGeneratorTests
 
                 [Getter]
                 public object? answer5 = null;
+
+                [Getter]
+                public IBar<object?> answer6 = null;
             }
             """,
             expected:
@@ -144,6 +149,11 @@ public class PropertyAccessorGeneratorTests
                     public object? Answer5
                     {
                         get => answer5;
+                    }
+
+                    public global::Macaron.PropertyAccessor.Tests.IBar<object?> Answer6
+                    {
+                        get => answer6;
                     }
                 }
             }
