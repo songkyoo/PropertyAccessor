@@ -571,7 +571,7 @@ public class PropertyAccessorGeneratorTests
             [AutoProperty]
             public partial class Foo
             {
-                private readonly int _ = null!;
+                [Getter] private readonly int _ = null!;
             }
             """,
             expected: "",
@@ -592,7 +592,7 @@ public class PropertyAccessorGeneratorTests
             [AutoProperty]
             public partial class Foo
             {
-                private readonly int Answer = null!;
+                [Getter] private readonly int Answer = null!;
             }
             """,
             expected: "",

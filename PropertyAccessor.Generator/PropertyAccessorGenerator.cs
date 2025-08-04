@@ -148,48 +148,6 @@ public sealed class PropertyAccessorGenerator : IIncrementalGenerator
             }
         }
 
-        var prefixArgument = autoPropertyAttribute?.ConstructorArguments[1].Value;
-        var memberLevelPrefix = GetPrefix(prefixArgument, prefix);
-
-        if (memberLevelPrefix == null)
-        {
-            diagnosticsBuilder.Add(Diagnostic.Create(
-                descriptor: InvalidPrefixPatternRule,
-                location: autoPropertyAttribute?.ApplicationSyntaxReference?.GetSyntax().GetLocation(),
-                messageArgs: [prefixArgument]
-            ));
-
-            return (null, diagnosticsBuilder.ToImmutable());
-        }
-
-        var propertyName = GetPropertyName(
-            fieldName: fieldName,
-            prefix: memberLevelPrefix,
-            namingRule: GetNamingRule(autoPropertyAttribute?.ConstructorArguments[2].Value, namingRule)
-        );
-
-        if (propertyName.Length < 1)
-        {
-            diagnosticsBuilder.Add(Diagnostic.Create(
-                descriptor: InvalidPropertyNameAfterPrefixRemovalRule,
-                location: fieldSymbol.Locations.FirstOrDefault(),
-                messageArgs: [fieldName, prefix]
-            ));
-
-            return (null, diagnosticsBuilder.ToImmutable());
-        }
-
-        if (propertyName == fieldName)
-        {
-            diagnosticsBuilder.Add(Diagnostic.Create(
-                descriptor: PropertyNameSameAsFieldNameRule,
-                location: fieldSymbol.Locations.FirstOrDefault(),
-                messageArgs: [fieldName, prefix, propertyName]
-            ));
-
-            return (null, diagnosticsBuilder.ToImmutable());
-        }
-
         var fieldTypeSymbolString = typeSymbol.ToDisplayString();
         if (fieldTypeSymbolString.StartsWith(ReadOnlyPropertyString))
         {
@@ -268,29 +226,69 @@ public sealed class PropertyAccessorGenerator : IIncrementalGenerator
             }
         }
 
-        if (hasGetter || hasSetter)
-        {
-            return (
-                new PropertyContext(
-                    AccessModifier: GetAccessModifier(
-                        autoPropertyAttribute?.ConstructorArguments[0].Value,
-                        accessModifier
-                    ),
-                    TypeSymbol: typeSymbol,
-                    Name: propertyName,
-                    FieldName: fieldName,
-                    HasGetter: hasGetter,
-                    HasSetter: hasSetter,
-                    IsInitSetter: !isDelegatedProperty && fieldSymbol.IsReadOnly,
-                    IsDelegated: isDelegatedProperty
-                ),
-                diagnosticsBuilder.ToImmutable()
-            );
-        }
-        else
+        if (!hasGetter && !hasSetter)
         {
             return (null, diagnosticsBuilder.ToImmutable());
         }
+
+        var prefixArgument = autoPropertyAttribute?.ConstructorArguments[1].Value;
+        var memberLevelPrefix = GetPrefix(prefixArgument, prefix);
+
+        if (memberLevelPrefix == null)
+        {
+            diagnosticsBuilder.Add(Diagnostic.Create(
+                descriptor: InvalidPrefixPatternRule,
+                location: autoPropertyAttribute?.ApplicationSyntaxReference?.GetSyntax().GetLocation(),
+                messageArgs: [prefixArgument]
+            ));
+
+            return (null, diagnosticsBuilder.ToImmutable());
+        }
+
+        var propertyName = GetPropertyName(
+            fieldName: fieldName,
+            prefix: memberLevelPrefix,
+            namingRule: GetNamingRule(autoPropertyAttribute?.ConstructorArguments[2].Value, namingRule)
+        );
+
+        if (propertyName.Length < 1)
+        {
+            diagnosticsBuilder.Add(Diagnostic.Create(
+                descriptor: InvalidPropertyNameAfterPrefixRemovalRule,
+                location: fieldSymbol.Locations.FirstOrDefault(),
+                messageArgs: [fieldName, prefix]
+            ));
+
+            return (null, diagnosticsBuilder.ToImmutable());
+        }
+
+        if (propertyName == fieldName)
+        {
+            diagnosticsBuilder.Add(Diagnostic.Create(
+                descriptor: PropertyNameSameAsFieldNameRule,
+                location: fieldSymbol.Locations.FirstOrDefault(),
+                messageArgs: [fieldName, prefix, propertyName]
+            ));
+
+            return (null, diagnosticsBuilder.ToImmutable());
+        }
+
+        return (
+            new PropertyContext(
+                AccessModifier: GetAccessModifier(
+                    autoPropertyAttribute?.ConstructorArguments[0].Value,
+                    accessModifier
+                ),
+                TypeSymbol: typeSymbol,
+                Name: propertyName,
+                FieldName: fieldName,
+                HasGetter: hasGetter,
+                HasSetter: hasSetter,
+                IsInitSetter: !isDelegatedProperty && fieldSymbol.IsReadOnly,
+                IsDelegated: isDelegatedProperty
+            ),
+            diagnosticsBuilder.ToImmutable()
+        );
 
         #region Local Functions
         static ITypeSymbol GetPropertyTypeSymbol(ITypeSymbol fieldTypeSymbol)
