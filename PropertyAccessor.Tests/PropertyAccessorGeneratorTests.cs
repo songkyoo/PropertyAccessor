@@ -489,6 +489,33 @@ public class PropertyAccessorGeneratorTests
     }
 
     [Test]
+    public void Should_NotTreatSameNamedDifferentArityInterfaceAsDelegatedProperty()
+    {
+        AssertGeneratedCode(
+            sourceCode:
+            """
+            namespace Macaron.PropertyAccessor;
+
+            public interface IReadOnlyProperty<T1, T2, T3>
+            {
+            }
+
+            namespace Macaron.PropertyAccessor.Tests;
+
+            [AutoProperty]
+            public partial class Foo
+            {
+                private readonly Macaron.PropertyAccessor.IReadOnlyProperty<int, string, bool> _answer = null!;
+            }
+            """,
+            expected: "",
+            out var diagnostics
+        );
+
+        Assert.That(diagnostics, Has.None.Matches<Diagnostic>(diagnostic => diagnostic.Id.StartsWith("MPROP")));
+    }
+
+    [Test]
     public void Should_NotGenerateProperty_When_IReadOnlyPropertyFieldIsNotReadonly()
     {
         AssertGeneratedCode(

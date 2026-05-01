@@ -18,16 +18,32 @@ public sealed class PropertyAccessorGenerator : IIncrementalGenerator
     private const string AutoPropertyAttributeString = "Macaron.PropertyAccessor.AutoPropertyAttribute";
     private const string GetterAttributeString = "Macaron.PropertyAccessor.GetterAttribute";
     private const string SetterAttributeString = "Macaron.PropertyAccessor.SetterAttribute";
-    private const string ReadOnlyPropertyString = "Macaron.PropertyAccessor.IReadOnlyProperty<";
-    private const string ReadWritePropertyString = "Macaron.PropertyAccessor.IReadWriteProperty<";
+    #endregion
+
+    #region Enums
+    private enum DelegatedPropertyKind
+    {
+        None,
+
+        ReadOnly,
+        ReadWrite
+    }
     #endregion
 
     #region Types
+    private sealed record DelegatedPropertyTypes(
+        INamedTypeSymbol? ReadOnlyProperty1,
+        INamedTypeSymbol? ReadOnlyProperty2,
+        INamedTypeSymbol? ReadWriteProperty1,
+        INamedTypeSymbol? ReadWriteProperty2
+    );
+
     private sealed record TypeContext(
         INamedTypeSymbol Symbol,
         PropertyAccessModifier AccessModifier,
         Regex Prefix,
-        PropertyNamingRule NamingRule
+        PropertyNamingRule NamingRule,
+        DelegatedPropertyTypes DelegatedPropertyTypes
     );
 
     private sealed record PropertyContext(
@@ -98,12 +114,18 @@ public sealed class PropertyAccessorGenerator : IIncrementalGenerator
         TypeContext typeContext
     )
     {
-        var (typeSymbol, accessModifier, prefix, namingRule) = typeContext;
+        var (typeSymbol, accessModifier, prefix, namingRule, _) = typeContext;
 
         return typeSymbol
             .GetMembers()
             .OfType<IFieldSymbol>()
-            .Select(symbol => GetGenerationContext(symbol, accessModifier, prefix, namingRule))
+            .Select(symbol => GetGenerationContext(
+                symbol,
+                accessModifier,
+                prefix,
+                namingRule,
+                typeContext.DelegatedPropertyTypes
+            ))
             .ToImmutableArray();
     }
 
@@ -111,7 +133,8 @@ public sealed class PropertyAccessorGenerator : IIncrementalGenerator
         IFieldSymbol fieldSymbol,
         PropertyAccessModifier accessModifier,
         Regex prefix,
-        PropertyNamingRule namingRule
+        PropertyNamingRule namingRule,
+        DelegatedPropertyTypes delegatedPropertyTypes
     )
     {
         var fieldName = fieldSymbol.Name;
@@ -148,8 +171,8 @@ public sealed class PropertyAccessorGenerator : IIncrementalGenerator
             }
         }
 
-        var fieldTypeSymbolString = typeSymbol.ToDisplayString();
-        if (fieldTypeSymbolString.StartsWith(ReadOnlyPropertyString))
+        var delegatedPropertyKind = GetDelegatedPropertyKind(typeSymbol, delegatedPropertyTypes);
+        if (delegatedPropertyKind == DelegatedPropertyKind.ReadOnly)
         {
             if (!fieldSymbol.IsReadOnly)
             {
@@ -180,7 +203,7 @@ public sealed class PropertyAccessorGenerator : IIncrementalGenerator
                 isDelegatedProperty = true;
             }
         }
-        else if (fieldTypeSymbolString.StartsWith(ReadWritePropertyString))
+        else if (delegatedPropertyKind == DelegatedPropertyKind.ReadWrite)
         {
             if (!fieldSymbol.IsReadOnly)
             {
@@ -291,6 +314,36 @@ public sealed class PropertyAccessorGenerator : IIncrementalGenerator
         );
 
         #region Local Functions
+        static DelegatedPropertyKind GetDelegatedPropertyKind(
+            ITypeSymbol fieldTypeSymbol,
+            DelegatedPropertyTypes delegatedPropertyTypes
+        )
+        {
+            if (fieldTypeSymbol is not INamedTypeSymbol namedTypeSymbol)
+            {
+                return DelegatedPropertyKind.None;
+            }
+
+            var originalDefinition = namedTypeSymbol.OriginalDefinition;
+            var comparer = SymbolEqualityComparer.Default;
+
+            if (comparer.Equals(originalDefinition, delegatedPropertyTypes.ReadOnlyProperty1) ||
+                comparer.Equals(originalDefinition, delegatedPropertyTypes.ReadOnlyProperty2)
+            )
+            {
+                return DelegatedPropertyKind.ReadOnly;
+            }
+
+            if (comparer.Equals(originalDefinition, delegatedPropertyTypes.ReadWriteProperty1) ||
+                comparer.Equals(originalDefinition, delegatedPropertyTypes.ReadWriteProperty2)
+            )
+            {
+                return DelegatedPropertyKind.ReadWrite;
+            }
+
+            return DelegatedPropertyKind.None;
+        }
+
         static ITypeSymbol GetPropertyTypeSymbol(ITypeSymbol fieldTypeSymbol)
         {
             return ((INamedTypeSymbol)fieldTypeSymbol).TypeArguments switch
@@ -483,7 +536,13 @@ public sealed class PropertyAccessorGenerator : IIncrementalGenerator
                             Symbol: typeSymbol,
                             AccessModifier: GetAccessModifier(attributeSymbol.ConstructorArguments[0].Value),
                             Prefix: typeLevelPrefix,
-                            NamingRule: GetNamingRule(attributeSymbol.ConstructorArguments[2].Value)
+                            NamingRule: GetNamingRule(attributeSymbol.ConstructorArguments[2].Value),
+                            DelegatedPropertyTypes: new DelegatedPropertyTypes(
+                                ReadOnlyProperty1: semanticModel.Compilation.GetTypeByMetadataName("Macaron.PropertyAccessor.IReadOnlyProperty`1"),
+                                ReadOnlyProperty2: semanticModel.Compilation.GetTypeByMetadataName("Macaron.PropertyAccessor.IReadOnlyProperty`2"),
+                                ReadWriteProperty1: semanticModel.Compilation.GetTypeByMetadataName("Macaron.PropertyAccessor.IReadWriteProperty`1"),
+                                ReadWriteProperty2: semanticModel.Compilation.GetTypeByMetadataName("Macaron.PropertyAccessor.IReadWriteProperty`2")
+                            )
                         ),
                         diagnosticsBuilder.ToImmutable()
                     );
