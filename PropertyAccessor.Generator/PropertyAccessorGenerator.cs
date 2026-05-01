@@ -434,19 +434,16 @@ public sealed class PropertyAccessorGenerator : IIncrementalGenerator
     #region IIncrementalGenerator Interface
     public void Initialize(IncrementalGeneratorInitializationContext context)
     {
-        var visitedTypes = new HashSet<INamedTypeSymbol>(SymbolEqualityComparer.Default);
-
         IncrementalValuesProvider<(TypeContext?, ImmutableArray<Diagnostic>)> valuesProvider = context
             .SyntaxProvider
             .CreateSyntaxProvider(
-                predicate: static (syntaxNode, _) => syntaxNode
-                    is ClassDeclarationSyntax
-                    or StructDeclarationSyntax
-                    or RecordDeclarationSyntax
-                    {
-                        AttributeLists.Count: > 0
-                    },
-                transform: (generatorSyntaxContext, _) =>
+                predicate: static (syntaxNode, _) =>
+                {
+                    return syntaxNode
+                        is TypeDeclarationSyntax { AttributeLists.Count: > 0 }
+                        and (ClassDeclarationSyntax or StructDeclarationSyntax or RecordDeclarationSyntax);
+                },
+                transform: static (generatorSyntaxContext, _) =>
                 {
                     var diagnosticsBuilder = ImmutableArray.CreateBuilder<Diagnostic>();
 
@@ -463,11 +460,6 @@ public sealed class PropertyAccessorGenerator : IIncrementalGenerator
                             return attributeData.AttributeClass?.ToDisplayString() == AutoPropertyAttributeString;
                         });
                     if (attributeSymbol == null)
-                    {
-                        return ((TypeContext?)null, diagnosticsBuilder.ToImmutable());
-                    }
-
-                    if (!visitedTypes.Add(typeSymbol))
                     {
                         return ((TypeContext?)null, diagnosticsBuilder.ToImmutable());
                     }
@@ -500,6 +492,8 @@ public sealed class PropertyAccessorGenerator : IIncrementalGenerator
 
         context.RegisterSourceOutput(valuesProvider.Collect(), (sourceProductionContext, typeContexts) =>
         {
+            var visitedTypes = new HashSet<INamedTypeSymbol>(SymbolEqualityComparer.Default);
+
             foreach (var (typeContext, typeDiagnostics) in typeContexts)
             {
                 foreach (var diagnostic in typeDiagnostics)
@@ -508,6 +502,11 @@ public sealed class PropertyAccessorGenerator : IIncrementalGenerator
                 }
 
                 if (typeContext == null)
+                {
+                    continue;
+                }
+
+                if (!visitedTypes.Add(typeContext.Symbol))
                 {
                     continue;
                 }
