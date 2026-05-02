@@ -1,4 +1,4 @@
-﻿using System.Collections.Immutable;
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 
@@ -30,7 +30,7 @@ public class PropertyAccessorGeneratorTests
 
     private static (ImmutableArray<Diagnostic> diagnostics, string generatedCode) CompileAndGetResults(string sourceCode)
     {
-        var attributeAssembly = typeof(SetterAttribute).Assembly;
+        var attributeAssembly = typeof(GetSetAttribute).Assembly;
         var references = AppDomain
             .CurrentDomain
             .GetAssemblies()
@@ -81,7 +81,7 @@ public class PropertyAccessorGeneratorTests
 
             public partial class Foo
             {
-                [Getter]
+                [Get]
                 private int _answer = 42;
             }
             """,
@@ -90,7 +90,7 @@ public class PropertyAccessorGeneratorTests
     }
 
     [Test]
-    public void Should_GenerateGetter_When_FieldIsMarkedWithGetterAttribute()
+    public void Should_GenerateGet_When_FieldIsMarkedWithGetAttribute()
     {
         AssertGeneratedCode(
             sourceCode:
@@ -104,22 +104,22 @@ public class PropertyAccessorGeneratorTests
             {
                 private int _answer0 = 42;
 
-                [Getter]
+                [Get]
                 private int _answer1 = 42;
 
-                [Getter]
+                [Get]
                 protected int m_answer2 = 42;
 
-                [Getter]
+                [Get]
                 public int answer3 = 42;
 
-                [Getter]
+                [Get]
                 public int? answer4 = null;
 
-                [Getter]
+                [Get]
                 public object? answer5 = null;
 
-                [Getter]
+                [Get]
                 public IBar<object?> answer6 = null;
             }
             """,
@@ -169,7 +169,7 @@ public class PropertyAccessorGeneratorTests
     }
 
     [Test]
-    public void Should_GenerateSetter_When_FieldIsMarkedWithSetterAttribute()
+    public void Should_GenerateGetSet_When_FieldIsMarkedWithGetSetAttribute()
     {
         AssertGeneratedCode(
             sourceCode:
@@ -181,19 +181,19 @@ public class PropertyAccessorGeneratorTests
             {
                 private int _answer0 = 42;
 
-                [Setter]
+                [GetSet]
                 private int _answer1 = 42;
 
-                [Setter]
+                [GetSet]
                 protected int m_answer2 = 42;
 
-                [Setter]
+                [GetSet]
                 public int answer3 = 42;
 
-                [Setter]
+                [GetSet]
                 public int? answer4 = null;
 
-                [Setter]
+                [GetSet]
                 public object? answer5 = null;
             }
             """,
@@ -208,26 +208,31 @@ public class PropertyAccessorGeneratorTests
                 {
                     public int Answer1
                     {
+                        get => _answer1;
                         set => _answer1 = value;
                     }
 
                     public int Answer2
                     {
+                        get => m_answer2;
                         set => m_answer2 = value;
                     }
 
                     public int Answer3
                     {
+                        get => answer3;
                         set => answer3 = value;
                     }
 
                     public int? Answer4
                     {
+                        get => answer4;
                         set => answer4 = value;
                     }
 
                     public object? Answer5
                     {
+                        get => answer5;
                         set => answer5 = value;
                     }
                 }
@@ -238,7 +243,7 @@ public class PropertyAccessorGeneratorTests
     }
 
     [Test]
-    public void Should_GenerateInitSetter_When_FieldIsMarkedWithSetterAttributeWithReadonlyModifier()
+    public void Should_GenerateInitGetSet_When_FieldIsMarkedWithGetSetAttributeWithReadonlyModifier()
     {
         AssertGeneratedCode(
             sourceCode:
@@ -248,7 +253,7 @@ public class PropertyAccessorGeneratorTests
             [AutoProperty]
             public partial class Foo
             {
-                [Setter]
+                [GetSet]
                 public readonly int _answer = 42;
             }
             """,
@@ -263,6 +268,7 @@ public class PropertyAccessorGeneratorTests
                 {
                     public int Answer
                     {
+                        get => _answer;
                         init => _answer = value;
                     }
                 }
@@ -273,7 +279,7 @@ public class PropertyAccessorGeneratorTests
     }
 
     [Test]
-    public void Should_GenerateGetterAndSetter_When_FieldHasGetterAndSetterAttributes()
+    public void Should_GenerateGetSet_When_FieldHasGetSetAttributes()
     {
         AssertGeneratedCode(
             sourceCode:
@@ -291,10 +297,10 @@ public class PropertyAccessorGeneratorTests
             [AutoProperty]
             public partial struct Foo<T>
             {
-                [Getter, Setter]
+                [GetSet]
                 private IReadOnlyList<Bar> _answers1;
 
-                [Getter, Setter]
+                [GetSet]
                 private Bar<T>[] _answers2;
             }
             """,
@@ -336,7 +342,7 @@ public class PropertyAccessorGeneratorTests
             [AutoProperty(accessModifier: PropertyAccessModifier.Protected, prefix: "m", namingRule: PropertyNamingRule.CamelCase)]
             public partial class Foo
             {
-                [Getter]
+                [Get]
                 public int mAnswer = 42;
             }
             """,
@@ -361,7 +367,7 @@ public class PropertyAccessorGeneratorTests
     }
 
     [Test]
-    public void Should_OverrideClassLevelSettings_With_FieldLevelAutoPropertySettings()
+    public void Should_OverrideClassLevelSettings_With_GetAndGetSetSettings()
     {
         AssertGeneratedCode(
             sourceCode:
@@ -371,13 +377,13 @@ public class PropertyAccessorGeneratorTests
             [AutoProperty(accessModifier: PropertyAccessModifier.Protected, prefix: "m", namingRule: PropertyNamingRule.CamelCase)]
             public partial class Foo
             {
-                [AutoProperty(prefix: "_"), Getter]
+                [Get(name: "bar")]
                 public string _bar = "bar";
 
-                [AutoProperty(accessModifier: PropertyAccessModifier.Private, prefix: "m_", namingRule: PropertyNamingRule.PascalCase), Getter, Setter]
+                [GetSet(accessModifier: PropertyAccessModifier.Private, name: "Answer")]
                 public int m_answer = 42;
 
-                [Getter]
+                [Get]
                 public int mAnswer = 42;
             }
             """,
@@ -413,7 +419,7 @@ public class PropertyAccessorGeneratorTests
     }
 
     [Test]
-    public void Should_GenerateGetter_When_FieldTypeIsIReadOnlyProperty()
+    public void Should_GenerateGet_When_FieldTypeIsIReadOnlyProperty()
     {
         AssertGeneratedCode(
             sourceCode:
@@ -453,7 +459,7 @@ public class PropertyAccessorGeneratorTests
     }
 
     [Test]
-    public void Should_GenerateGetterAndSetter_When_FieldTypeIsIReadWriteProperty()
+    public void Should_GenerateGetSet_When_FieldTypeIsIReadWriteProperty()
     {
         AssertGeneratedCode(
             sourceCode:
@@ -568,7 +574,7 @@ public class PropertyAccessorGeneratorTests
             public partial class Foo
             {
                 private IReadWriteProperty<int> _wrongAnswer = null!;
-                [Getter, Setter]
+
                 private readonly IReadWriteProperty<int> _answer = null!;
             }
             """,
@@ -594,6 +600,53 @@ public class PropertyAccessorGeneratorTests
     }
 
     [Test]
+    public void Should_ReportDiagnostic_When_GetOrGetSetIsAppliedToDelegatedPropertyField()
+    {
+        AssertGeneratedCode(
+            sourceCode:
+            """
+            namespace Macaron.PropertyAccessor.Tests;
+
+            [AutoProperty]
+            public partial class Foo
+            {
+                [Get]
+                private readonly IReadOnlyProperty<int> _answer1 = null!;
+
+                [GetSet]
+                private readonly IReadWriteProperty<int> _answer2 = null!;
+            }
+            """,
+            expected:
+            """
+            // <auto-generated />
+            #nullable enable
+
+            namespace Macaron.PropertyAccessor.Tests
+            {
+                partial class Foo
+                {
+                    public int Answer1
+                    {
+                        get => _answer1.Get(this);
+                    }
+
+                    public int Answer2
+                    {
+                        get => _answer2.Get(this);
+                        set => _answer2.Set(this, value);
+                    }
+                }
+            }
+
+            """,
+            out var diagnostics
+        );
+
+        Assert.That(diagnostics.Count(diagnostic => diagnostic.Id == "MPROP0002"), Is.EqualTo(2));
+    }
+
+    [Test]
     public void Should_ReportDiagnostic_When_GeneratedPropertyNameIsEmpty()
     {
         AssertGeneratedCode(
@@ -604,7 +657,7 @@ public class PropertyAccessorGeneratorTests
             [AutoProperty]
             public partial class Foo
             {
-                [Getter] private readonly int _ = null!;
+                [Get] private readonly int _ = null!;
             }
             """,
             expected: "",
@@ -625,7 +678,7 @@ public class PropertyAccessorGeneratorTests
             [AutoProperty]
             public partial class Foo
             {
-                [Getter] private readonly int Answer = null!;
+                [Get] private readonly int Answer = null!;
             }
             """,
             expected: "",
@@ -646,7 +699,7 @@ public class PropertyAccessorGeneratorTests
             [AutoProperty(prefix: "[invalid")]
             public partial class Foo
             {
-                [Getter]
+                [Get]
                 private int _answer = 42;
             }
             """,
@@ -661,7 +714,7 @@ public class PropertyAccessorGeneratorTests
     }
 
     [Test]
-    public void Should_ReportError_When_FieldLevelPrefixRegexIsInvalid()
+    public void Should_ReportDiagnostic_When_FieldLevelAutoPropertyIsUsed()
     {
         AssertGeneratedCode(
             sourceCode:
@@ -671,18 +724,31 @@ public class PropertyAccessorGeneratorTests
             [AutoProperty]
             public partial class Foo
             {
-                [AutoProperty(prefix: "*+invalid"), Getter]
+                [AutoProperty(prefix: "_"), Get]
                 private int _answer = 42;
             }
             """,
-            expected: "",
+            expected:
+            """
+            // <auto-generated />
+            #nullable enable
+
+            namespace Macaron.PropertyAccessor.Tests
+            {
+                partial class Foo
+                {
+                    public int Answer
+                    {
+                        get => _answer;
+                    }
+                }
+            }
+
+            """,
             out var diagnostics
         );
 
-        Assert.That(diagnostics, Has.Some.Matches<Diagnostic>(diagnostic =>
-            diagnostic.Id == "MPROP0006" &&
-            diagnostic.GetMessage().Contains("*+invalid")
-        ));
+        Assert.That(diagnostics, Has.Some.Matches<Diagnostic>(diagnostic => diagnostic.Id == "CS0592"));
     }
 
     [Test]
@@ -695,7 +761,7 @@ public class PropertyAccessorGeneratorTests
             [AutoProperty(prefix: "")]
             public partial class Foo
             {
-                [Getter]
+                [Get]
                 private int _answer = 42;
             }
             """,
@@ -734,16 +800,16 @@ public class PropertyAccessorGeneratorTests
             [AutoProperty(prefix: @"^(m_|_|s_)")]
             public partial class Foo
             {
-                [Getter]
+                [Get]
                 private int m_answer1 = 42;
 
-                [Getter]
+                [Get]
                 private int _answer2 = 42;
 
-                [Getter]
+                [Get]
                 private static int s_answer3 = 42;
 
-                [Getter]
+                [Get]
                 private int normalField = 42;
             }
             """,
@@ -791,15 +857,15 @@ public class PropertyAccessorGeneratorTests
             [AutoProperty]
             public partial class Foo
             {
-                [Getter]
+                [Get]
                 private static int s_getter = 1;
 
-                [Setter]
+                [GetSet]
                 private static int s_setter = 2;
 
                 private static readonly IReadOnlyProperty<int> s_delegated = null!;
 
-                [Getter]
+                [Get]
                 private int _answer = 42;
             }
             """,
@@ -837,12 +903,12 @@ public class PropertyAccessorGeneratorTests
             [AutoProperty]
             public partial class Outer
             {
-                [Getter]
+                [Get]
                 private int _outerField = 1;
 
                 public partial class Inner
                 {
-                    [Getter]
+                    [Get]
                     private int _innerField = 2;
                 }
             }
@@ -878,13 +944,13 @@ public class PropertyAccessorGeneratorTests
             [AutoProperty]
             public partial class Foo
             {
-                [Getter]
+                [Get]
                 private int _answer = 42;
             }
 
             public partial class Foo
             {
-                [Getter]
+                [Get]
                 private string _message = "hello";
             }
             """,
@@ -931,7 +997,7 @@ public class PropertyAccessorGeneratorTests
                 [AutoProperty]
                 public partial class Inner
                 {
-                    [Getter]
+                    [Get]
                     private int _innerField = 2;
                 }
             }
@@ -976,7 +1042,7 @@ public class PropertyAccessorGeneratorTests
                     [AutoProperty]
                     public partial struct Inner<TInner>
                     {
-                        [Getter]
+                        [Get]
                         private Dictionary<TOuter, (TContainer Container, TInner Inner)> _map;
                     }
                 }
@@ -1022,14 +1088,14 @@ public class PropertyAccessorGeneratorTests
             [AutoProperty]
             public partial record Person
             {
-                [Getter]
+                [Get]
                 private string _name = "";
             }
 
             [AutoProperty]
             public readonly partial record struct Point
             {
-                [Getter]
+                [Get]
                 private readonly int _x;
             }
             """,
@@ -1072,13 +1138,13 @@ public class PropertyAccessorGeneratorTests
                 where T : class, IComparable<T>
                 where U : struct
             {
-                [Getter, Setter]
+                [GetSet]
                 private T _item;
 
-                [Getter]
+                [Get]
                 private readonly U _value;
 
-                [Getter, Setter]
+                [GetSet]
                 private List<T> _items;
             }
             """,
@@ -1128,13 +1194,13 @@ public class PropertyAccessorGeneratorTests
             [AutoProperty]
             public partial class ComplexGenericClass<T>
             {
-                [Getter, Setter]
+                [GetSet]
                 private Dictionary<string, List<T>> _complexField;
 
-                [Getter]
+                [Get]
                 private readonly Func<T, bool> _predicate;
 
-                [Getter, Setter]
+                [GetSet]
                 private (int id, T value) _tupleField;
             }
             """,
@@ -1181,19 +1247,19 @@ public class PropertyAccessorGeneratorTests
             [AutoProperty]
             public partial class SpecialCharacterClass
             {
-                [Getter]
+                [Get]
                 private int @class = 1;
 
-                [Getter]
+                [Get]
                 private string _ünicodeField = "";
 
-                [Getter]
+                [Get]
                 private bool _field123 = false;
 
-                [Getter]
+                [Get]
                 private double __doubleUnderscore1 = 0.0;
 
-                [AutoProperty(prefix: "_*"), Getter]
+                [Get(name: "DoubleUnderscore2")]
                 private double __doubleUnderscore2 = 0.0;
             }
             """,

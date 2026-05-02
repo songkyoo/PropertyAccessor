@@ -16,11 +16,19 @@ public sealed class PropertyAccessorGenerator : IIncrementalGenerator
 {
     #region Constants
     private const string AutoPropertyAttributeString = "Macaron.PropertyAccessor.AutoPropertyAttribute";
-    private const string GetterAttributeString = "Macaron.PropertyAccessor.GetterAttribute";
-    private const string SetterAttributeString = "Macaron.PropertyAccessor.SetterAttribute";
+    private const string GetAttributeString = "Macaron.PropertyAccessor.GetAttribute";
+    private const string GetSetAttributeString = "Macaron.PropertyAccessor.GetSetAttribute";
     #endregion
 
     #region Enums
+    private enum PropertyAccessorKind
+    {
+        None,
+
+        Get,
+        GetSet
+    }
+
     private enum DelegatedPropertyKind
     {
         None,
@@ -51,9 +59,8 @@ public sealed class PropertyAccessorGenerator : IIncrementalGenerator
         ITypeSymbol TypeSymbol,
         string Name,
         string FieldName,
-        bool HasGetter,
-        bool HasSetter,
-        bool IsInitSetter,
+        PropertyAccessorKind AccessorKind,
+        bool IsInitAccessor,
         bool IsDelegated
     );
     #endregion
@@ -67,18 +74,10 @@ public sealed class PropertyAccessorGenerator : IIncrementalGenerator
         DiagnosticSeverity.Error,
         isEnabledByDefault: true
     );
-    private static readonly DiagnosticDescriptor GetterRedundantForDelegatedPropertyRule = new(
+    private static readonly DiagnosticDescriptor GetOrGetSetNotAllowedForDelegatedPropertyRule = new(
         id: "MPROP0002",
-        title: "Getter is not allowed for delegated properties",
-        messageFormat: "Field '{0}' must not have a getter",
-        category: "Usage",
-        DiagnosticSeverity.Error,
-        isEnabledByDefault: true
-    );
-    private static readonly DiagnosticDescriptor SetterRedundantForDelegatedPropertyRule = new(
-        id: "MPROP0003",
-        title: "Setter is not allowed for delegated properties",
-        messageFormat: "Field '{0}' must not have a setter",
+        title: "Get and GetSet are not allowed for delegated properties",
+        messageFormat: "Field '{0}' must not use Get or GetSet because delegated properties are configured by interface type",
         category: "Usage",
         DiagnosticSeverity.Error,
         isEnabledByDefault: true
@@ -147,11 +146,9 @@ public sealed class PropertyAccessorGenerator : IIncrementalGenerator
     {
         var fieldName = fieldSymbol.Name;
         var typeSymbol = fieldSymbol.Type;
-        var autoPropertyAttribute = (AttributeData?)null;
-        var getterAttribute = (AttributeData?)null;
-        var setterAttribute = (AttributeData?)null;
-        var hasGetter = false;
-        var hasSetter = false;
+        var getAttribute = (AttributeData?)null;
+        var getSetAttribute = (AttributeData?)null;
+        var accessorKind = PropertyAccessorKind.None;
         var isDelegatedProperty = false;
         var diagnosticsBuilder = ImmutableArray.CreateBuilder<Diagnostic>();
 
@@ -159,28 +156,27 @@ public sealed class PropertyAccessorGenerator : IIncrementalGenerator
         {
             switch (attributeData.AttributeClass?.ToDisplayString())
             {
-                case AutoPropertyAttributeString:
+                case GetAttributeString:
                 {
-                    autoPropertyAttribute = attributeData;
+                    getAttribute = attributeData;
+                    if (accessorKind == PropertyAccessorKind.None)
+                    {
+                        accessorKind = PropertyAccessorKind.Get;
+                    }
+
                     break;
                 }
-                case GetterAttributeString:
+                case GetSetAttributeString:
                 {
-                    getterAttribute = attributeData;
-                    hasGetter = true;
-                    break;
-                }
-                case SetterAttributeString:
-                {
-                    setterAttribute = attributeData;
-                    hasSetter = true;
+                    getSetAttribute = attributeData;
+                    accessorKind = PropertyAccessorKind.GetSet;
                     break;
                 }
             }
         }
 
         var delegatedPropertyKind = GetDelegatedPropertyKind(typeSymbol, delegatedPropertyTypes);
-        if (fieldSymbol.IsStatic && (hasGetter || hasSetter || delegatedPropertyKind != DelegatedPropertyKind.None))
+        if (fieldSymbol.IsStatic && (accessorKind != PropertyAccessorKind.None || delegatedPropertyKind != DelegatedPropertyKind.None))
         {
             diagnosticsBuilder.Add(Diagnostic.Create(
                 descriptor: StaticFieldNotSupportedRule,
@@ -201,23 +197,19 @@ public sealed class PropertyAccessorGenerator : IIncrementalGenerator
                     messageArgs: [fieldName]
                 ));
 
-                hasGetter = false;
             }
             else
             {
-                if (hasGetter)
+                if (accessorKind != PropertyAccessorKind.None)
                 {
                     diagnosticsBuilder.Add(Diagnostic.Create(
-                        descriptor: GetterRedundantForDelegatedPropertyRule,
-                        location: getterAttribute!.ApplicationSyntaxReference?.GetSyntax().GetLocation(),
+                        descriptor: GetOrGetSetNotAllowedForDelegatedPropertyRule,
+                        location: (getSetAttribute ?? getAttribute)?.ApplicationSyntaxReference?.GetSyntax().GetLocation(),
                         messageArgs: [fieldName]
                     ));
                 }
-                else
-                {
-                    hasGetter = true;
-                }
 
+                accessorKind = PropertyAccessorKind.Get;
                 typeSymbol = GetPropertyTypeSymbol(typeSymbol);
                 isDelegatedProperty = true;
             }
@@ -231,67 +223,35 @@ public sealed class PropertyAccessorGenerator : IIncrementalGenerator
                     location: fieldSymbol.Locations.FirstOrDefault(),
                     messageArgs: [fieldName]
                 ));
-
-                hasGetter = false;
-                hasSetter = false;
             }
             else
             {
-                if (hasGetter)
+                if (accessorKind != PropertyAccessorKind.None)
                 {
                     diagnosticsBuilder.Add(Diagnostic.Create(
-                        descriptor: GetterRedundantForDelegatedPropertyRule,
-                        location: getterAttribute!.ApplicationSyntaxReference?.GetSyntax().GetLocation(),
+                        descriptor: GetOrGetSetNotAllowedForDelegatedPropertyRule,
+                        location: (getSetAttribute ?? getAttribute)?.ApplicationSyntaxReference?.GetSyntax().GetLocation(),
                         messageArgs: [fieldName]
                     ));
                 }
-                else
-                {
-                    hasGetter = true;
-                }
 
-                if (hasSetter)
-                {
-                    diagnosticsBuilder.Add(Diagnostic.Create(
-                        descriptor: SetterRedundantForDelegatedPropertyRule,
-                        location: setterAttribute!.ApplicationSyntaxReference?.GetSyntax().GetLocation(),
-                        messageArgs: [fieldName]
-                    ));
-                }
-                else
-                {
-                    hasSetter = true;
-                }
-
+                accessorKind = PropertyAccessorKind.GetSet;
                 typeSymbol = GetPropertyTypeSymbol(typeSymbol);
                 isDelegatedProperty = true;
             }
         }
 
-        if (!hasGetter && !hasSetter)
+        if (accessorKind == PropertyAccessorKind.None)
         {
             return (null, diagnosticsBuilder.ToImmutable());
         }
 
-        var prefixArgument = autoPropertyAttribute?.ConstructorArguments[1].Value;
-        var memberLevelPrefix = GetPrefix(prefixArgument, prefix);
+        var shapeAttribute = getSetAttribute ?? getAttribute;
+        var explicitPropertyName = shapeAttribute?.ConstructorArguments[1].Value as string;
 
-        if (memberLevelPrefix == null)
-        {
-            diagnosticsBuilder.Add(Diagnostic.Create(
-                descriptor: InvalidPrefixPatternRule,
-                location: autoPropertyAttribute?.ApplicationSyntaxReference?.GetSyntax().GetLocation(),
-                messageArgs: [prefixArgument]
-            ));
-
-            return (null, diagnosticsBuilder.ToImmutable());
-        }
-
-        var propertyName = GetPropertyName(
-            fieldName: fieldName,
-            prefix: memberLevelPrefix,
-            namingRule: GetNamingRule(autoPropertyAttribute?.ConstructorArguments[2].Value, namingRule)
-        );
+        var propertyName = !string.IsNullOrWhiteSpace(explicitPropertyName)
+            ? explicitPropertyName!
+            : GetPropertyName(fieldName, prefix, namingRule);
 
         if (propertyName.Length < 1)
         {
@@ -318,15 +278,14 @@ public sealed class PropertyAccessorGenerator : IIncrementalGenerator
         return (
             new PropertyContext(
                 AccessModifier: GetAccessModifier(
-                    autoPropertyAttribute?.ConstructorArguments[0].Value,
+                    isDelegatedProperty ? null : shapeAttribute?.ConstructorArguments[0].Value,
                     accessModifier
                 ),
                 TypeSymbol: typeSymbol,
                 Name: propertyName,
                 FieldName: fieldName,
-                HasGetter: hasGetter,
-                HasSetter: hasSetter,
-                IsInitSetter: !isDelegatedProperty && fieldSymbol.IsReadOnly,
+                AccessorKind: accessorKind,
+                IsInitAccessor: !isDelegatedProperty && fieldSymbol.IsReadOnly,
                 IsDelegated: isDelegatedProperty
             ),
             diagnosticsBuilder.ToImmutable()
@@ -398,13 +357,12 @@ public sealed class PropertyAccessorGenerator : IIncrementalGenerator
             typeSymbol,
             propertyName,
             fieldName,
-            hasGetter,
-            hasSetter,
-            isInitSetter,
+            accessorKind,
+            isInitAccessor,
             isDelegatedProperty
         ) = propertyContext;
 
-        if (!hasGetter && !hasSetter)
+        if (accessorKind == PropertyAccessorKind.None)
         {
             return ImmutableArray<string>.Empty;
         }
@@ -417,14 +375,14 @@ public sealed class PropertyAccessorGenerator : IIncrementalGenerator
         builder.Add($"{GetAccessorModifier(accessModifier)} {typeSymbol.ToDisplayString(FullyQualifiedFormat.WithMiscellaneousOptions(IncludeNullableReferenceTypeModifier | UseSpecialTypes))} {escapedPropertyName}");
         builder.Add($"{{");
 
-        if (hasGetter)
+        if (accessorKind is PropertyAccessorKind.Get or PropertyAccessorKind.GetSet)
         {
             builder.Add($"{Indent}get => {escapedFieldName}{(isDelegatedProperty ? ".Get(this)" : "")};");
         }
 
-        if (hasSetter)
+        if (accessorKind == PropertyAccessorKind.GetSet)
         {
-            builder.Add($"{Indent}{(isInitSetter ? "init" : "set")} => {escapedFieldName}{(isDelegatedProperty ? ".Set(this, value)" : " = value")};");
+            builder.Add($"{Indent}{(isInitAccessor ? "init" : "set")} => {escapedFieldName}{(isDelegatedProperty ? ".Set(this, value)" : " = value")};");
         }
 
         builder.Add($"}}");

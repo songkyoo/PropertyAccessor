@@ -1,6 +1,9 @@
-﻿namespace Macaron.PropertyAccessor;
+﻿using System.Diagnostics;
 
-[AttributeUsage(AttributeTargets.Class | AttributeTargets.Struct | AttributeTargets.Field, Inherited = false)]
+namespace Macaron.PropertyAccessor;
+
+[Conditional("SOURCE_GENERATOR_ONLY")]
+[AttributeUsage(AttributeTargets.Class | AttributeTargets.Struct, Inherited = false)]
 public class AutoPropertyAttribute(
     PropertyAccessModifier accessModifier = PropertyAccessModifier.Default,
     string prefix = "",

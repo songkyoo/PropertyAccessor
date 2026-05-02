@@ -36,7 +36,7 @@ public partial class Foo
 {
     public partial class Bar
     {
-        [Getter]
+        [Get]
         private int _baz;
     }
 }
@@ -44,9 +44,9 @@ public partial class Foo
 
 위와 같은 코드가 있는 경우 `_baz`에 대한 프로퍼티는 생성되지 않습니다. `_baz`에 대한 프로퍼티를 생성하려면 `Bar` 클래스 선언에 `AutoProperty` 어트리뷰트를 적용해야 합니다.
 
-### Getter, Setter 어트리뷰트를 사용하기
+### Get, GetSet 어트리뷰트를 사용하기
 
-`static`이 아닌 필드에 `Getter`와 `Setter` 어트리뷰트를 적용함으로써 프로퍼티를 추가할 수 있습니다.
+`static`이 아닌 필드에 `Get`과 `GetSet` 어트리뷰트를 적용함으로써 프로퍼티를 추가할 수 있습니다.
 
 ```csharp
 using Macaron.PropertyAccessor;
@@ -54,14 +54,14 @@ using Macaron.PropertyAccessor;
 [AutoProperty]
 public partial class Foo
 {
-    [Getter]
+    [Get]
     private int _bar;
     
-    [Getter, Setter]
+    [GetSet]
     private int _baz;
     
-    // readonly 필드에 Setter를 선언하면 set 대신 init을 사용합니다.
-    [Getter, Setter]
+    // readonly 필드에 GetSet을 선언하면 set 대신 init을 사용합니다.
+    [GetSet]
     private readonly int _qux;
 }
 ```
@@ -117,6 +117,8 @@ public partial class Foo
 ```
 
 > :warning: 인터페이스를 구현한 타입이 아니라 인터페이스를 사용해야 합니다.
+
+위 인터페이스 기반 프로퍼티는 `Get` 또는 `GetSet` 어트리뷰트로 설정하지 않습니다. 읽기/쓰기 여부는 `IReadOnlyProperty<...>`와 `IReadWriteProperty<...>` 타입으로 결정됩니다.
 
 위 코드는 다음과 같은 코드를 생성합니다.
 
@@ -302,7 +304,7 @@ using Macaron.PropertyAccessor;
 )]
 public partial class Foo
 {
-    [Getter]
+    [Get]
     private string fName;
 }
 ```
@@ -335,22 +337,22 @@ using Macaron.PropertyAccessor;
 public partial class Foo
 {
     // 프로퍼티 이름은 name이 됩니다.
-    [Getter]
+    [Get]
     private string fName;
  
     [AutoProperty]
     public partial class Bar
     {
         // 외부에 선언된 AutoProperty의 설정을 적용하지 않기 때문에 프로퍼티 이름은 FAge가 됩니다.
-        [Getter]
+        [Get]
         public int fAge;
     }
 }
 ```
 
-#### 멤버에 AutoProperty 선언하기
+#### 필드별 이름과 접근 한정자 지정하기
 
-필드에도 `AutoProperty` 어트리뷰트를 적용할 수 있습니다. 이 경우 기본값은 타입에 적용된 `AutoProperty`의 옵션 값을 따릅니다.
+필드별 프로퍼티 이름과 접근 한정자는 `Get` 또는 `GetSet` 어트리뷰트에서 지정할 수 있습니다. 지정하지 않은 값은 타입에 적용된 `AutoProperty` 옵션을 따릅니다.
 
 ```csharp
 using Macaron.PropertyAccessor;
@@ -358,9 +360,11 @@ using Macaron.PropertyAccessor;
 [AutoProperty(accessModifier: PropertyAccessModifier.Protected)]
 public partial class Foo
 {
-    // 지정하지 않은 accessModifier 옵션은 타입에 적용된 AutoProperty에서 지정된 값을 따릅니다.
-    [AutoProperty(prefix:"f", namingRule: PropertyNamingRule.CamelCase), Getter]
+    [Get(name: "name")]
     private string fName;
+
+    [GetSet(accessModifier: PropertyAccessModifier.Private, name: "Age")]
+    private int fAge;
 }
 ```
 
@@ -375,6 +379,12 @@ partial class Foo
     protected string name
     {
         get => fName;
+    }
+
+    private int Age
+    {
+        get => fAge;
+        set => fAge = value;
     }
 }
 ```
