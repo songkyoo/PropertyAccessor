@@ -107,6 +107,14 @@ public sealed class PropertyAccessorGenerator : IIncrementalGenerator
         DiagnosticSeverity.Error,
         isEnabledByDefault: true
     );
+    private static readonly DiagnosticDescriptor StaticFieldNotSupportedRule = new(
+        id: "MPROP0007",
+        title: "Static fields are not supported",
+        messageFormat: "Field '{0}' must not be static",
+        category: "Usage",
+        DiagnosticSeverity.Error,
+        isEnabledByDefault: true
+    );
 
     private static readonly Regex DefaultRegex = new(pattern: "^(_|m_)", RegexOptions.Compiled);
 
@@ -172,6 +180,17 @@ public sealed class PropertyAccessorGenerator : IIncrementalGenerator
         }
 
         var delegatedPropertyKind = GetDelegatedPropertyKind(typeSymbol, delegatedPropertyTypes);
+        if (fieldSymbol.IsStatic && (hasGetter || hasSetter || delegatedPropertyKind != DelegatedPropertyKind.None))
+        {
+            diagnosticsBuilder.Add(Diagnostic.Create(
+                descriptor: StaticFieldNotSupportedRule,
+                location: fieldSymbol.Locations.FirstOrDefault(),
+                messageArgs: [fieldName]
+            ));
+
+            return (null, diagnosticsBuilder.ToImmutable());
+        }
+
         if (delegatedPropertyKind == DelegatedPropertyKind.ReadOnly)
         {
             if (!fieldSymbol.IsReadOnly)

@@ -46,7 +46,7 @@ public partial class Foo
 
 ### Getter, Setter 어트리뷰트를 사용하기
 
-필드에 `Getter`와 `Setter` 어트리뷰트를 적용함으로써 프로퍼티를 추가할 수 있습니다.
+`static`이 아닌 필드에 `Getter`와 `Setter` 어트리뷰트를 적용함으로써 프로퍼티를 추가할 수 있습니다.
 
 ```csharp
 using Macaron.PropertyAccessor;
@@ -97,7 +97,7 @@ partial class Foo
 
 ### IReadOnlyProperty, IReadWriteProperty 인터페이스를 사용하기
 
-`IReadOnlyProperty<TProperty>`, `IReadOnlyProperty<T, TProperty>`, `IReadWriteProperty<TProperty>`, `IReadWriteProperty<T, TProperty>` 중 하나의 타입을 `readonly` 필드 멤버로 선언하면 프로퍼티가 자동으로 생성됩니다.
+`IReadOnlyProperty<TProperty>`, `IReadOnlyProperty<T, TProperty>`, `IReadWriteProperty<TProperty>`, `IReadWriteProperty<T, TProperty>` 중 하나의 타입을 `readonly` 필드 멤버로 선언하면 프로퍼티가 자동으로 생성됩니다. `static`은 지원하지 않습니다.
 
 ```csharp
 using Macaron.PropertyAccessor;
