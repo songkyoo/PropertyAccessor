@@ -528,7 +528,7 @@ public class PropertyAccessorGeneratorTests
     }
 
     [Test]
-    public void Should_NotGenerateProperty_When_IReadOnlyPropertyFieldIsNotReadonly()
+    public void Should_ReportDiagnosticAndNotGenerateProperty_When_IReadOnlyPropertyFieldIsNotReadonly()
     {
         AssertGeneratedCode(
             sourceCode:
@@ -558,12 +558,18 @@ public class PropertyAccessorGeneratorTests
                 }
             }
 
-            """
+            """,
+            out var diagnostics
         );
+
+        Assert.That(diagnostics, Has.Some.Matches<Diagnostic>(diagnostic =>
+            diagnostic.Id == "MPROP0001" &&
+            diagnostic.GetMessage().Contains("_wrongAnswer")
+        ));
     }
 
     [Test]
-    public void Should_NotGenerateProperty_When_IReadWritePropertyFieldIsNotReadonly()
+    public void Should_ReportDiagnosticAndNotGenerateProperty_When_IReadWritePropertyFieldIsNotReadonly()
     {
         AssertGeneratedCode(
             sourceCode:
@@ -595,8 +601,46 @@ public class PropertyAccessorGeneratorTests
                 }
             }
 
-            """
+            """,
+            out var diagnostics
         );
+
+        Assert.That(diagnostics, Has.Some.Matches<Diagnostic>(diagnostic =>
+            diagnostic.Id == "MPROP0001" &&
+            diagnostic.GetMessage().Contains("_wrongAnswer")
+        ));
+    }
+
+    [Test]
+    public void Should_ReportDiagnostic_When_DelegatedPropertyFieldsAreNotReadonly()
+    {
+        AssertGeneratedCode(
+            sourceCode:
+            """
+            namespace Macaron.PropertyAccessor.Tests;
+
+            [AutoProperty]
+            public partial class Foo
+            {
+                private IReadOnlyProperty<int> _readOnly1 = null!;
+                private IReadOnlyProperty<Foo, int> _readOnly2 = null!;
+                private IReadWriteProperty<int> _readWrite1 = null!;
+                private IReadWriteProperty<Foo, int> _readWrite2 = null!;
+            }
+            """,
+            expected: "",
+            out var diagnostics
+        );
+
+        var readonlyDiagnostics = diagnostics
+            .Where(diagnostic => diagnostic.Id == "MPROP0001")
+            .ToImmutableArray();
+
+        Assert.That(readonlyDiagnostics, Has.Length.EqualTo(4));
+        Assert.That(readonlyDiagnostics, Has.Some.Matches<Diagnostic>(diagnostic => diagnostic.GetMessage().Contains("_readOnly1")));
+        Assert.That(readonlyDiagnostics, Has.Some.Matches<Diagnostic>(diagnostic => diagnostic.GetMessage().Contains("_readOnly2")));
+        Assert.That(readonlyDiagnostics, Has.Some.Matches<Diagnostic>(diagnostic => diagnostic.GetMessage().Contains("_readWrite1")));
+        Assert.That(readonlyDiagnostics, Has.Some.Matches<Diagnostic>(diagnostic => diagnostic.GetMessage().Contains("_readWrite2")));
     }
 
     [Test]
