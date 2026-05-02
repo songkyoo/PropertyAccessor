@@ -419,12 +419,12 @@ public sealed class PropertyAccessorGenerator : IIncrementalGenerator
 
         if (hasGetter)
         {
-            builder.Add($"{Space}get => {escapedFieldName}{(isDelegatedProperty ? ".Get(this)" : "")};");
+            builder.Add($"{Indent}get => {escapedFieldName}{(isDelegatedProperty ? ".Get(this)" : "")};");
         }
 
         if (hasSetter)
         {
-            builder.Add($"{Space}{(isInitSetter ? "init" : "set")} => {escapedFieldName}{(isDelegatedProperty ? ".Set(this, value)" : " = value")};");
+            builder.Add($"{Indent}{(isInitSetter ? "init" : "set")} => {escapedFieldName}{(isDelegatedProperty ? ".Set(this, value)" : " = value")};");
         }
 
         builder.Add($"}}");

@@ -3,12 +3,15 @@ using System.Text;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Text;
 
+using static Microsoft.CodeAnalysis.CSharp.SyntaxFacts;
+using static Microsoft.CodeAnalysis.CSharp.SyntaxKind;
+
 namespace Macaron.PropertyAccessor;
 
 public static class SourceGenerationHelpers
 {
     #region Constants
-    public const string Space = "    ";
+    public const string Indent = "    ";
     #endregion
 
     #region Methods
@@ -42,7 +45,7 @@ public static class SourceGenerationHelpers
             parentType = parentType.ContainingType;
         }
 
-        var depthSpacerText = hasNamespace ? $"{Space}" : "";
+        var depthSpacerText = hasNamespace ? $"{Indent}" : "";
 
         // begin nestedTypes
         for (var i = nestedTypes.Count - 1; i >= 0; --i)
@@ -52,7 +55,7 @@ public static class SourceGenerationHelpers
             stringBuilder.AppendLine($"{depthSpacerText}{GetPartialTypeDeclarationString(nestedType)}");
             stringBuilder.AppendLine($"{depthSpacerText}{{");
 
-            depthSpacerText += $"{Space}";
+            depthSpacerText += $"{Indent}";
         }
 
         // begin containingType
@@ -60,7 +63,7 @@ public static class SourceGenerationHelpers
         stringBuilder.AppendLine($"{depthSpacerText}{{");
 
         // generate factory methods
-        depthSpacerText += $"{Space}";
+        depthSpacerText += $"{Indent}";
 
         foreach (var line in lines)
         {
@@ -104,10 +107,26 @@ public static class SourceGenerationHelpers
 
     private static string GetPartialTypeDeclarationString(INamedTypeSymbol typeSymbol)
     {
+        var typeModifier = typeSymbol.IsReadOnly ? "readonly " : "";
         var typeKind = GetTypeKindString(typeSymbol);
-        var typeName = typeSymbol.ToDisplayString(SymbolDisplayFormat.MinimallyQualifiedFormat);
+        var typeName = GetTypeNameString(typeSymbol);
 
-        return $"partial {typeKind} {typeName}";
+        return $"{typeModifier}partial {typeKind} {typeName}";
+    }
+
+    private static string GetTypeNameString(INamedTypeSymbol typeSymbol)
+    {
+        var typeName = GetEscapedIdentifier(typeSymbol.Name);
+        if (typeSymbol.TypeParameters.Length == 0)
+        {
+            return typeName;
+        }
+
+        var typeParameters = typeSymbol
+            .TypeParameters
+            .Select(typeParameter => GetEscapedIdentifier(typeParameter.Name));
+
+        return $"{typeName}<{string.Join(", ", typeParameters)}>";
     }
 
     private static string GetHintName(INamedTypeSymbol typeSymbol)
@@ -142,8 +161,15 @@ public static class SourceGenerationHelpers
             TypeKind.Class => "class",
             TypeKind.Struct => "struct",
             TypeKind.Interface => "interface",
-            _ => throw new InvalidOperationException($"Invalid type kind: {typeSymbol.TypeKind}")
+            _ => throw new InvalidOperationException($"Invalid type kind: {typeSymbol.TypeKind}"),
         };
+    }
+
+    private static string GetEscapedIdentifier(string identifier)
+    {
+        return GetKeywordKind(identifier) != None || GetContextualKeywordKind(identifier) != None
+            ? "@" + identifier
+            : identifier;
     }
     #endregion
 }
