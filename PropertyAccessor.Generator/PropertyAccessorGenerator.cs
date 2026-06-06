@@ -51,6 +51,7 @@ public sealed class PropertyAccessorGenerator : IIncrementalGenerator
         PropertyAccessModifier AccessModifier,
         Regex Prefix,
         PropertyNamingRule NamingRule,
+        CSharpCompilation Compilation,
         DelegatedPropertyTypes DelegatedPropertyTypes
     );
 
@@ -61,7 +62,8 @@ public sealed class PropertyAccessorGenerator : IIncrementalGenerator
         string FieldName,
         PropertyAccessorKind AccessorKind,
         bool IsInitAccessor,
-        bool IsDelegated
+        bool IsDelegated,
+        bool GetterRequiresExplicitConversion
     );
     #endregion
 
@@ -114,6 +116,14 @@ public sealed class PropertyAccessorGenerator : IIncrementalGenerator
         DiagnosticSeverity.Error,
         isEnabledByDefault: true
     );
+    private static readonly DiagnosticDescriptor InvalidGetterConversionRule = new(
+        id: "MPROP0008",
+        title: "Field type cannot be converted to property type",
+        messageFormat: "Field '{0}' of type '{1}' cannot be cast to property type '{2}'",
+        category: "Usage",
+        DiagnosticSeverity.Error,
+        isEnabledByDefault: true
+    );
 
     private static readonly Regex DefaultRegex = new(pattern: "^(_|m_)", RegexOptions.Compiled);
 
@@ -121,7 +131,7 @@ public sealed class PropertyAccessorGenerator : IIncrementalGenerator
         TypeContext typeContext
     )
     {
-        var (typeSymbol, accessModifier, prefix, namingRule, _) = typeContext;
+        var (typeSymbol, accessModifier, prefix, namingRule, compilation, _) = typeContext;
 
         return typeSymbol
             .GetMembers()
@@ -131,6 +141,7 @@ public sealed class PropertyAccessorGenerator : IIncrementalGenerator
                 accessModifier,
                 prefix,
                 namingRule,
+                compilation,
                 typeContext.DelegatedPropertyTypes
             ))
             .ToImmutableArray();
@@ -141,15 +152,19 @@ public sealed class PropertyAccessorGenerator : IIncrementalGenerator
         PropertyAccessModifier accessModifier,
         Regex prefix,
         PropertyNamingRule namingRule,
+        CSharpCompilation compilation,
         DelegatedPropertyTypes delegatedPropertyTypes
     )
     {
         var fieldName = fieldSymbol.Name;
-        var typeSymbol = fieldSymbol.Type;
+        var fieldTypeSymbol = fieldSymbol.Type;
+
         var getAttribute = (AttributeData?)null;
         var getSetAttribute = (AttributeData?)null;
         var accessorKind = PropertyAccessorKind.None;
         var isDelegatedProperty = false;
+        var getterRequiresExplicitConversion = false;
+
         var diagnosticsBuilder = ImmutableArray.CreateBuilder<Diagnostic>();
 
         foreach (var attributeData in fieldSymbol.GetAttributes())
@@ -175,8 +190,11 @@ public sealed class PropertyAccessorGenerator : IIncrementalGenerator
             }
         }
 
-        var delegatedPropertyKind = GetDelegatedPropertyKind(typeSymbol, delegatedPropertyTypes);
-        if (fieldSymbol.IsStatic && (accessorKind != PropertyAccessorKind.None || delegatedPropertyKind != DelegatedPropertyKind.None))
+        var delegatedPropertyKind = GetDelegatedPropertyKind(fieldTypeSymbol, delegatedPropertyTypes);
+
+        if (fieldSymbol.IsStatic
+            && (accessorKind != PropertyAccessorKind.None || delegatedPropertyKind != DelegatedPropertyKind.None)
+        )
         {
             diagnosticsBuilder.Add(Diagnostic.Create(
                 descriptor: StaticFieldNotSupportedRule,
@@ -186,6 +204,8 @@ public sealed class PropertyAccessorGenerator : IIncrementalGenerator
 
             return (null, diagnosticsBuilder.ToImmutable());
         }
+
+        var typeSymbol = fieldTypeSymbol;
 
         if (delegatedPropertyKind == DelegatedPropertyKind.ReadOnly)
         {
@@ -247,8 +267,37 @@ public sealed class PropertyAccessorGenerator : IIncrementalGenerator
         }
 
         var shapeAttribute = getSetAttribute ?? getAttribute;
-        var explicitPropertyName = shapeAttribute?.ConstructorArguments[1].Value as string;
+        if (!isDelegatedProperty &&
+            accessorKind == PropertyAccessorKind.Get &&
+            getAttribute is { ConstructorArguments.Length: > 0 } &&
+            getAttribute.ConstructorArguments[0].Value is ITypeSymbol propertyTypeSymbol
+        )
+        {
+            var diagnosticLocation = getAttribute.ApplicationSyntaxReference?.GetSyntax().GetLocation();
+            var getterConversion = compilation.ClassifyConversion(fieldTypeSymbol, propertyTypeSymbol);
 
+            if (!getterConversion.Exists)
+            {
+                diagnosticsBuilder.Add(Diagnostic.Create(
+                    descriptor: InvalidGetterConversionRule,
+                    location: diagnosticLocation,
+                    messageArgs:
+                    [
+                        fieldName,
+                        fieldTypeSymbol.ToDisplayString(MinimallyQualifiedFormat),
+                        propertyTypeSymbol.ToDisplayString(MinimallyQualifiedFormat)
+                    ]
+                ));
+
+                return (null, diagnosticsBuilder.ToImmutable());
+            }
+
+            typeSymbol = propertyTypeSymbol;
+            getterRequiresExplicitConversion = !getterConversion.IsImplicit;
+        }
+
+        var usesGetAttribute = ReferenceEquals(shapeAttribute, getAttribute);
+        var explicitPropertyName = GetConstructorArgumentValue(shapeAttribute, usesGetAttribute ? 2 : 1) as string;
         var propertyName = !string.IsNullOrWhiteSpace(explicitPropertyName)
             ? explicitPropertyName!
             : GetPropertyName(fieldName, prefix, namingRule);
@@ -278,7 +327,9 @@ public sealed class PropertyAccessorGenerator : IIncrementalGenerator
         return (
             new PropertyContext(
                 AccessModifier: GetAccessModifier(
-                    isDelegatedProperty ? null : shapeAttribute?.ConstructorArguments[0].Value,
+                    isDelegatedProperty
+                        ? null
+                        : GetConstructorArgumentValue(shapeAttribute, usesGetAttribute ? 1 : 0),
                     accessModifier
                 ),
                 TypeSymbol: typeSymbol,
@@ -286,7 +337,8 @@ public sealed class PropertyAccessorGenerator : IIncrementalGenerator
                 FieldName: fieldName,
                 AccessorKind: accessorKind,
                 IsInitAccessor: !isDelegatedProperty && fieldSymbol.IsReadOnly,
-                IsDelegated: isDelegatedProperty
+                IsDelegated: isDelegatedProperty,
+                GetterRequiresExplicitConversion: getterRequiresExplicitConversion
             ),
             diagnosticsBuilder.ToImmutable()
         );
@@ -335,6 +387,7 @@ public sealed class PropertyAccessorGenerator : IIncrementalGenerator
         static string GetPropertyName(string fieldName, Regex prefix, PropertyNamingRule namingRule)
         {
             var prefixRemovedName = prefix.Replace(input: fieldName, replacement: "", count: 1);
+
             if (prefixRemovedName.Length < 1)
             {
                 return "";
@@ -344,8 +397,17 @@ public sealed class PropertyAccessorGenerator : IIncrementalGenerator
             {
                 PropertyNamingRule.PascalCase => char.ToUpperInvariant(prefixRemovedName[0]) + prefixRemovedName[1..],
                 PropertyNamingRule.CamelCase => char.ToLowerInvariant(prefixRemovedName[0]) + prefixRemovedName[1..],
-                _ => throw new InvalidOperationException($"Invalid naming rule: {namingRule}")
+                _ => throw new InvalidOperationException($"Invalid naming rule: {namingRule}"),
             };
+        }
+
+        static object? GetConstructorArgumentValue(AttributeData? attributeData, int index)
+        {
+            var constructorArguments = attributeData?.ConstructorArguments;
+
+            return constructorArguments is { Length: > 0 and var length } && index < length
+                ? constructorArguments.Value[index].Value
+                : null;
         }
         #endregion
     }
@@ -359,7 +421,8 @@ public sealed class PropertyAccessorGenerator : IIncrementalGenerator
             fieldName,
             accessorKind,
             isInitAccessor,
-            isDelegatedProperty
+            isDelegatedProperty,
+            getterRequiresExplicitConversion
         ) = propertyContext;
 
         if (accessorKind == PropertyAccessorKind.None)
@@ -369,15 +432,25 @@ public sealed class PropertyAccessorGenerator : IIncrementalGenerator
 
         var escapedFieldName = GetEscapedKeyword(fieldName);
         var escapedPropertyName = GetEscapedKeyword(propertyName);
+        var propertyTypeName = typeSymbol.ToDisplayString(FullyQualifiedFormat.WithMiscellaneousOptions(
+            IncludeNullableReferenceTypeModifier | UseSpecialTypes
+        ));
 
         var builder = ImmutableArray.CreateBuilder<string>();
 
-        builder.Add($"{GetAccessorModifier(accessModifier)} {typeSymbol.ToDisplayString(FullyQualifiedFormat.WithMiscellaneousOptions(IncludeNullableReferenceTypeModifier | UseSpecialTypes))} {escapedPropertyName}");
+        builder.Add($"{GetAccessorModifier(accessModifier)} {propertyTypeName} {escapedPropertyName}");
         builder.Add($"{{");
 
         if (accessorKind is PropertyAccessorKind.Get or PropertyAccessorKind.GetSet)
         {
-            builder.Add($"{Indent}get => {escapedFieldName}{(isDelegatedProperty ? ".Get(this)" : "")};");
+            var getterExpression = $"{escapedFieldName}{(isDelegatedProperty ? ".Get(this)" : "")}";
+
+            if (getterRequiresExplicitConversion)
+            {
+                getterExpression = $"({propertyTypeName}){getterExpression}";
+            }
+
+            builder.Add($"{Indent}get => {getterExpression};");
         }
 
         if (accessorKind == PropertyAccessorKind.GetSet)
@@ -401,7 +474,7 @@ public sealed class PropertyAccessorGenerator : IIncrementalGenerator
                 PropertyAccessModifier.ProtectedInternal => "protected internal",
                 PropertyAccessModifier.PrivateProtected => "private protected",
                 PropertyAccessModifier.File => "file",
-                _ => throw new InvalidOperationException($"Invalid access modifier: {accessModifier}")
+                _ => throw new InvalidOperationException($"Invalid access modifier: {accessModifier}"),
             };
         }
         #endregion
@@ -478,6 +551,7 @@ public sealed class PropertyAccessorGenerator : IIncrementalGenerator
                     var diagnosticsBuilder = ImmutableArray.CreateBuilder<Diagnostic>();
 
                     var semanticModel = generatorSyntaxContext.SemanticModel;
+
                     if (semanticModel.GetDeclaredSymbol(generatorSyntaxContext.Node) is not INamedTypeSymbol typeSymbol)
                     {
                         return ((TypeContext?)null, diagnosticsBuilder.ToImmutable());
@@ -489,6 +563,7 @@ public sealed class PropertyAccessorGenerator : IIncrementalGenerator
                         {
                             return attributeData.AttributeClass?.ToDisplayString() == AutoPropertyAttributeString;
                         });
+
                     if (attributeSymbol == null)
                     {
                         return ((TypeContext?)null, diagnosticsBuilder.ToImmutable());
@@ -514,6 +589,7 @@ public sealed class PropertyAccessorGenerator : IIncrementalGenerator
                             AccessModifier: GetAccessModifier(attributeSymbol.ConstructorArguments[0].Value),
                             Prefix: typeLevelPrefix,
                             NamingRule: GetNamingRule(attributeSymbol.ConstructorArguments[2].Value),
+                            Compilation: (CSharpCompilation)semanticModel.Compilation,
                             DelegatedPropertyTypes: new DelegatedPropertyTypes(
                                 ReadOnlyProperty1: semanticModel.Compilation.GetTypeByMetadataName("Macaron.PropertyAccessor.IReadOnlyProperty`1"),
                                 ReadOnlyProperty2: semanticModel.Compilation.GetTypeByMetadataName("Macaron.PropertyAccessor.IReadOnlyProperty`2"),
