@@ -28,32 +28,15 @@ public sealed class PropertyAccessorGenerator : IIncrementalGenerator
         Get,
         GetSet
     }
-
-    private enum DelegatedPropertyKind
-    {
-        None,
-
-        ReadOnly,
-        ReadWrite
-    }
     #endregion
 
     #region Types
-    private sealed record DelegatedPropertyTypes(
-        INamedTypeSymbol? ReadOnlyProperty1,
-        INamedTypeSymbol? ReadOnlyProperty2,
-        INamedTypeSymbol? ReadWriteProperty1,
-        INamedTypeSymbol? ReadWriteProperty2
-    );
-
     private sealed record TypeContext(
         INamedTypeSymbol Symbol,
         PropertyAccessModifier AccessModifier,
         Regex Prefix,
         PropertyNamingRule NamingRule,
-        CSharpCompilation Compilation,
-        DelegatedPropertyTypes DelegatedPropertyTypes,
-        bool HasAutoProperty
+        CSharpCompilation Compilation
     );
 
     private sealed record PropertyContext(
@@ -63,28 +46,11 @@ public sealed class PropertyAccessorGenerator : IIncrementalGenerator
         string FieldName,
         PropertyAccessorKind AccessorKind,
         bool IsInitAccessor,
-        bool IsDelegated,
         bool GetterRequiresExplicitConversion
     );
     #endregion
 
     #region Static
-    private static readonly DiagnosticDescriptor DelegatedPropertyMustBeReadonlyRule = new(
-        id: "MPROP0001",
-        title: "Delegated property fields must be readonly",
-        messageFormat: "Field '{0}' must be marked readonly",
-        category: "Usage",
-        DiagnosticSeverity.Error,
-        isEnabledByDefault: true
-    );
-    private static readonly DiagnosticDescriptor GetOrGetSetNotAllowedForDelegatedPropertyRule = new(
-        id: "MPROP0002",
-        title: "Get and GetSet are not allowed for delegated properties",
-        messageFormat: "Field '{0}' must not use Get or GetSet because delegated properties are configured by interface type",
-        category: "Usage",
-        DiagnosticSeverity.Error,
-        isEnabledByDefault: true
-    );
     private static readonly DiagnosticDescriptor InvalidPropertyNameAfterPrefixRemovalRule = new(
         id: "MPROP0004",
         title: "Cannot generate property name after prefix removal",
@@ -132,19 +98,18 @@ public sealed class PropertyAccessorGenerator : IIncrementalGenerator
         TypeContext typeContext
     )
     {
-        var (typeSymbol, accessModifier, prefix, namingRule, compilation, _, hasAutoProperty) = typeContext;
+        var (typeSymbol, accessModifier, prefix, namingRule, compilation) = typeContext;
 
         return typeSymbol
             .GetMembers()
             .OfType<IFieldSymbol>()
-            .Where(fieldSymbol => hasAutoProperty || HasAccessorAttribute(fieldSymbol))
+            .Where(HasAccessorAttribute)
             .Select(symbol => GetGenerationContext(
                 symbol,
                 accessModifier,
                 prefix,
                 namingRule,
-                compilation,
-                typeContext.DelegatedPropertyTypes
+                compilation
             ))
             .ToImmutableArray();
 
@@ -166,8 +131,7 @@ public sealed class PropertyAccessorGenerator : IIncrementalGenerator
         PropertyAccessModifier accessModifier,
         Regex prefix,
         PropertyNamingRule namingRule,
-        CSharpCompilation compilation,
-        DelegatedPropertyTypes delegatedPropertyTypes
+        CSharpCompilation compilation
     )
     {
         var fieldName = fieldSymbol.Name;
@@ -176,7 +140,6 @@ public sealed class PropertyAccessorGenerator : IIncrementalGenerator
         var getAttribute = (AttributeData?)null;
         var getSetAttribute = (AttributeData?)null;
         var accessorKind = PropertyAccessorKind.None;
-        var isDelegatedProperty = false;
         var getterRequiresExplicitConversion = false;
 
         var diagnosticsBuilder = ImmutableArray.CreateBuilder<Diagnostic>();
@@ -204,11 +167,7 @@ public sealed class PropertyAccessorGenerator : IIncrementalGenerator
             }
         }
 
-        var delegatedPropertyKind = GetDelegatedPropertyKind(fieldTypeSymbol, delegatedPropertyTypes);
-
-        if (fieldSymbol.IsStatic
-            && (accessorKind != PropertyAccessorKind.None || delegatedPropertyKind != DelegatedPropertyKind.None)
-        )
+        if (fieldSymbol.IsStatic && accessorKind != PropertyAccessorKind.None)
         {
             diagnosticsBuilder.Add(Diagnostic.Create(
                 descriptor: StaticFieldNotSupportedRule,
@@ -221,68 +180,13 @@ public sealed class PropertyAccessorGenerator : IIncrementalGenerator
 
         var typeSymbol = fieldTypeSymbol;
 
-        if (delegatedPropertyKind == DelegatedPropertyKind.ReadOnly)
-        {
-            if (!fieldSymbol.IsReadOnly)
-            {
-                diagnosticsBuilder.Add(Diagnostic.Create(
-                    descriptor: DelegatedPropertyMustBeReadonlyRule,
-                    location: fieldSymbol.Locations.FirstOrDefault(),
-                    messageArgs: [fieldName]
-                ));
-
-            }
-            else
-            {
-                if (accessorKind != PropertyAccessorKind.None)
-                {
-                    diagnosticsBuilder.Add(Diagnostic.Create(
-                        descriptor: GetOrGetSetNotAllowedForDelegatedPropertyRule,
-                        location: (getSetAttribute ?? getAttribute)?.ApplicationSyntaxReference?.GetSyntax().GetLocation(),
-                        messageArgs: [fieldName]
-                    ));
-                }
-
-                accessorKind = PropertyAccessorKind.Get;
-                typeSymbol = GetPropertyTypeSymbol(typeSymbol);
-                isDelegatedProperty = true;
-            }
-        }
-        else if (delegatedPropertyKind == DelegatedPropertyKind.ReadWrite)
-        {
-            if (!fieldSymbol.IsReadOnly)
-            {
-                diagnosticsBuilder.Add(Diagnostic.Create(
-                    descriptor: DelegatedPropertyMustBeReadonlyRule,
-                    location: fieldSymbol.Locations.FirstOrDefault(),
-                    messageArgs: [fieldName]
-                ));
-            }
-            else
-            {
-                if (accessorKind != PropertyAccessorKind.None)
-                {
-                    diagnosticsBuilder.Add(Diagnostic.Create(
-                        descriptor: GetOrGetSetNotAllowedForDelegatedPropertyRule,
-                        location: (getSetAttribute ?? getAttribute)?.ApplicationSyntaxReference?.GetSyntax().GetLocation(),
-                        messageArgs: [fieldName]
-                    ));
-                }
-
-                accessorKind = PropertyAccessorKind.GetSet;
-                typeSymbol = GetPropertyTypeSymbol(typeSymbol);
-                isDelegatedProperty = true;
-            }
-        }
-
         if (accessorKind == PropertyAccessorKind.None)
         {
             return (null, diagnosticsBuilder.ToImmutable());
         }
 
         var shapeAttribute = getSetAttribute ?? getAttribute;
-        if (!isDelegatedProperty &&
-            accessorKind == PropertyAccessorKind.Get &&
+        if (accessorKind == PropertyAccessorKind.Get &&
             getAttribute is { ConstructorArguments.Length: > 0 } &&
             getAttribute.ConstructorArguments[0].Value is ITypeSymbol propertyTypeSymbol
         )
@@ -341,63 +245,20 @@ public sealed class PropertyAccessorGenerator : IIncrementalGenerator
         return (
             new PropertyContext(
                 AccessModifier: GetAccessModifier(
-                    isDelegatedProperty
-                        ? null
-                        : GetConstructorArgumentValue(shapeAttribute, usesGetAttribute ? 1 : 0),
+                    GetConstructorArgumentValue(shapeAttribute, usesGetAttribute ? 1 : 0),
                     accessModifier
                 ),
                 TypeSymbol: typeSymbol,
                 Name: propertyName,
                 FieldName: fieldName,
                 AccessorKind: accessorKind,
-                IsInitAccessor: !isDelegatedProperty && fieldSymbol.IsReadOnly,
-                IsDelegated: isDelegatedProperty,
+                IsInitAccessor: fieldSymbol.IsReadOnly,
                 GetterRequiresExplicitConversion: getterRequiresExplicitConversion
             ),
             diagnosticsBuilder.ToImmutable()
         );
 
         #region Local Functions
-        static DelegatedPropertyKind GetDelegatedPropertyKind(
-            ITypeSymbol fieldTypeSymbol,
-            DelegatedPropertyTypes delegatedPropertyTypes
-        )
-        {
-            if (fieldTypeSymbol is not INamedTypeSymbol namedTypeSymbol)
-            {
-                return DelegatedPropertyKind.None;
-            }
-
-            var originalDefinition = namedTypeSymbol.OriginalDefinition;
-            var comparer = SymbolEqualityComparer.Default;
-
-            if (comparer.Equals(originalDefinition, delegatedPropertyTypes.ReadOnlyProperty1) ||
-                comparer.Equals(originalDefinition, delegatedPropertyTypes.ReadOnlyProperty2)
-            )
-            {
-                return DelegatedPropertyKind.ReadOnly;
-            }
-
-            if (comparer.Equals(originalDefinition, delegatedPropertyTypes.ReadWriteProperty1) ||
-                comparer.Equals(originalDefinition, delegatedPropertyTypes.ReadWriteProperty2)
-            )
-            {
-                return DelegatedPropertyKind.ReadWrite;
-            }
-
-            return DelegatedPropertyKind.None;
-        }
-
-        static ITypeSymbol GetPropertyTypeSymbol(ITypeSymbol fieldTypeSymbol)
-        {
-            return ((INamedTypeSymbol)fieldTypeSymbol).TypeArguments switch
-            {
-                [var propertyType] => propertyType,
-                [_, var propertyType] => propertyType,
-                _ => throw new InvalidOperationException($"Invalid field type: {fieldTypeSymbol}"),
-            };
-        }
-
         static string GetPropertyName(string fieldName, Regex prefix, PropertyNamingRule namingRule)
         {
             var prefixRemovedName = prefix.Replace(input: fieldName, replacement: "", count: 1);
@@ -435,7 +296,6 @@ public sealed class PropertyAccessorGenerator : IIncrementalGenerator
             fieldName,
             accessorKind,
             isInitAccessor,
-            isDelegatedProperty,
             getterRequiresExplicitConversion
         ) = propertyContext;
 
@@ -457,7 +317,7 @@ public sealed class PropertyAccessorGenerator : IIncrementalGenerator
 
         if (accessorKind is PropertyAccessorKind.Get or PropertyAccessorKind.GetSet)
         {
-            var getterExpression = $"{escapedFieldName}{(isDelegatedProperty ? ".Get(this)" : "")}";
+            var getterExpression = escapedFieldName;
 
             if (getterRequiresExplicitConversion)
             {
@@ -469,7 +329,7 @@ public sealed class PropertyAccessorGenerator : IIncrementalGenerator
 
         if (accessorKind == PropertyAccessorKind.GetSet)
         {
-            builder.Add($"{Indent}{(isInitAccessor ? "init" : "set")} => {escapedFieldName}{(isDelegatedProperty ? ".Set(this, value)" : " = value")};");
+            builder.Add($"{Indent}{(isInitAccessor ? "init" : "set")} => {escapedFieldName} = value;");
         }
 
         builder.Add($"}}");
@@ -595,7 +455,7 @@ public sealed class PropertyAccessorGenerator : IIncrementalGenerator
                             return attributeName is GetAttributeString or GetSetAttributeString;
                         }));
 
-                    if (attributeSymbol == null && !hasAccessorField)
+                    if (!hasAccessorField)
                     {
                         return ((TypeContext?)null, diagnosticsBuilder.ToImmutable());
                     }
@@ -620,14 +480,7 @@ public sealed class PropertyAccessorGenerator : IIncrementalGenerator
                             AccessModifier: GetAccessModifier(attributeSymbol?.ConstructorArguments[0].Value),
                             Prefix: typeLevelPrefix,
                             NamingRule: GetNamingRule(attributeSymbol?.ConstructorArguments[2].Value),
-                            Compilation: (CSharpCompilation)semanticModel.Compilation,
-                            DelegatedPropertyTypes: new DelegatedPropertyTypes(
-                                ReadOnlyProperty1: semanticModel.Compilation.GetTypeByMetadataName("Macaron.PropertyAccessor.IReadOnlyProperty`1"),
-                                ReadOnlyProperty2: semanticModel.Compilation.GetTypeByMetadataName("Macaron.PropertyAccessor.IReadOnlyProperty`2"),
-                                ReadWriteProperty1: semanticModel.Compilation.GetTypeByMetadataName("Macaron.PropertyAccessor.IReadWriteProperty`1"),
-                                ReadWriteProperty2: semanticModel.Compilation.GetTypeByMetadataName("Macaron.PropertyAccessor.IReadWriteProperty`2")
-                            ),
-                            HasAutoProperty: attributeSymbol != null
+                            Compilation: (CSharpCompilation)semanticModel.Compilation
                         ),
                         diagnosticsBuilder.ToImmutable()
                     );
