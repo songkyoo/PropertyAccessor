@@ -15,7 +15,7 @@ dotnet pack ./PropertyAccessor/PropertyAccessor.csproj -c Release
 
 ## 사용법
 
-프로퍼티를 자동으로 구현하고자 하는 타입은 `AutoProperty` 어트리뷰트를 적용하고 `partial` 한정자를 추가해야 합니다.
+프로퍼티를 자동으로 구현하고자 하는 타입에는 `partial` 한정자를 추가해야 합니다. 필드에 `Get` 또는 `GetSet` 어트리뷰트를 적용하여 프로퍼티를 생성할 수 있습니다. `AutoProperty`를 타입에 선언하는 것으로 공통 옵션을 지정할 수 있습니다.
 
 ```csharp
 using Macaron.PropertyAccessor;
@@ -134,7 +134,7 @@ partial class Foo
 
 ### IReadOnlyProperty, IReadWriteProperty 인터페이스를 사용하기
 
-`IReadOnlyProperty<TProperty>`, `IReadOnlyProperty<T, TProperty>`, `IReadWriteProperty<TProperty>`, `IReadWriteProperty<T, TProperty>` 중 하나의 타입을 `readonly` 필드 멤버로 선언하면 프로퍼티가 자동으로 생성됩니다. `static`은 지원하지 않습니다.
+타입에 `AutoProperty` 어트리뷰트를 선언하고 `IReadOnlyProperty<TProperty>`, `IReadOnlyProperty<T, TProperty>`, `IReadWriteProperty<TProperty>`, `IReadWriteProperty<T, TProperty>` 중 하나의 타입을 `readonly` 필드 멤버로 선언하면 프로퍼티가 자동으로 생성됩니다. `static`은 지원하지 않습니다.
 
 ```csharp
 using Macaron.PropertyAccessor;

@@ -52,7 +52,8 @@ public sealed class PropertyAccessorGenerator : IIncrementalGenerator
         Regex Prefix,
         PropertyNamingRule NamingRule,
         CSharpCompilation Compilation,
-        DelegatedPropertyTypes DelegatedPropertyTypes
+        DelegatedPropertyTypes DelegatedPropertyTypes,
+        bool HasAutoProperty
     );
 
     private sealed record PropertyContext(
@@ -131,11 +132,12 @@ public sealed class PropertyAccessorGenerator : IIncrementalGenerator
         TypeContext typeContext
     )
     {
-        var (typeSymbol, accessModifier, prefix, namingRule, compilation, _) = typeContext;
+        var (typeSymbol, accessModifier, prefix, namingRule, compilation, _, hasAutoProperty) = typeContext;
 
         return typeSymbol
             .GetMembers()
             .OfType<IFieldSymbol>()
+            .Where(fieldSymbol => hasAutoProperty || HasAccessorAttribute(fieldSymbol))
             .Select(symbol => GetGenerationContext(
                 symbol,
                 accessModifier,
@@ -145,6 +147,18 @@ public sealed class PropertyAccessorGenerator : IIncrementalGenerator
                 typeContext.DelegatedPropertyTypes
             ))
             .ToImmutableArray();
+
+        #region Local Functions
+        static bool HasAccessorAttribute(IFieldSymbol fieldSymbol)
+        {
+            return fieldSymbol.GetAttributes().Any(attributeData =>
+            {
+                var attributeName = attributeData.AttributeClass?.ToDisplayString();
+
+                return attributeName is GetAttributeString or GetSetAttributeString;
+            });
+        }
+        #endregion
     }
 
     private static (PropertyContext?, ImmutableArray<Diagnostic>) GetGenerationContext(
@@ -543,8 +557,15 @@ public sealed class PropertyAccessorGenerator : IIncrementalGenerator
                 predicate: static (syntaxNode, _) =>
                 {
                     return syntaxNode
-                        is TypeDeclarationSyntax { AttributeLists.Count: > 0 }
-                        and (ClassDeclarationSyntax or StructDeclarationSyntax or RecordDeclarationSyntax);
+                           is TypeDeclarationSyntax typeDeclaration
+                           and (ClassDeclarationSyntax or StructDeclarationSyntax or RecordDeclarationSyntax)
+                           && (
+                               typeDeclaration.AttributeLists.Count > 0 ||
+                               typeDeclaration
+                                   .Members
+                                   .OfType<FieldDeclarationSyntax>()
+                                   .Any(fieldDeclaration => fieldDeclaration.AttributeLists.Count > 0)
+                           );
                 },
                 transform: static (generatorSyntaxContext, _) =>
                 {
@@ -564,19 +585,29 @@ public sealed class PropertyAccessorGenerator : IIncrementalGenerator
                             return attributeData.AttributeClass?.ToDisplayString() == AutoPropertyAttributeString;
                         });
 
-                    if (attributeSymbol == null)
+                    var hasAccessorField = typeSymbol
+                        .GetMembers()
+                        .OfType<IFieldSymbol>()
+                        .Any(fieldSymbol => fieldSymbol.GetAttributes().Any(attributeData =>
+                        {
+                            var attributeName = attributeData.AttributeClass?.ToDisplayString();
+
+                            return attributeName is GetAttributeString or GetSetAttributeString;
+                        }));
+
+                    if (attributeSymbol == null && !hasAccessorField)
                     {
                         return ((TypeContext?)null, diagnosticsBuilder.ToImmutable());
                     }
 
-                    var prefixArgument = attributeSymbol.ConstructorArguments[1].Value;
+                    var prefixArgument = attributeSymbol?.ConstructorArguments[1].Value;
                     var typeLevelPrefix = GetPrefix(prefixArgument);
 
                     if (typeLevelPrefix == null)
                     {
                         diagnosticsBuilder.Add(Diagnostic.Create(
                             descriptor: InvalidPrefixPatternRule,
-                            location: attributeSymbol.ApplicationSyntaxReference?.GetSyntax().GetLocation(),
+                            location: attributeSymbol?.ApplicationSyntaxReference?.GetSyntax().GetLocation(),
                             messageArgs: [prefixArgument]
                         ));
 
@@ -586,16 +617,17 @@ public sealed class PropertyAccessorGenerator : IIncrementalGenerator
                     return (
                         new TypeContext(
                             Symbol: typeSymbol,
-                            AccessModifier: GetAccessModifier(attributeSymbol.ConstructorArguments[0].Value),
+                            AccessModifier: GetAccessModifier(attributeSymbol?.ConstructorArguments[0].Value),
                             Prefix: typeLevelPrefix,
-                            NamingRule: GetNamingRule(attributeSymbol.ConstructorArguments[2].Value),
+                            NamingRule: GetNamingRule(attributeSymbol?.ConstructorArguments[2].Value),
                             Compilation: (CSharpCompilation)semanticModel.Compilation,
                             DelegatedPropertyTypes: new DelegatedPropertyTypes(
                                 ReadOnlyProperty1: semanticModel.Compilation.GetTypeByMetadataName("Macaron.PropertyAccessor.IReadOnlyProperty`1"),
                                 ReadOnlyProperty2: semanticModel.Compilation.GetTypeByMetadataName("Macaron.PropertyAccessor.IReadOnlyProperty`2"),
                                 ReadWriteProperty1: semanticModel.Compilation.GetTypeByMetadataName("Macaron.PropertyAccessor.IReadWriteProperty`1"),
                                 ReadWriteProperty2: semanticModel.Compilation.GetTypeByMetadataName("Macaron.PropertyAccessor.IReadWriteProperty`2")
-                            )
+                            ),
+                            HasAutoProperty: attributeSymbol != null
                         ),
                         diagnosticsBuilder.ToImmutable()
                     );
