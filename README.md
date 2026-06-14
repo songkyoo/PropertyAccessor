@@ -15,34 +15,7 @@ dotnet pack ./PropertyAccessor/PropertyAccessor.csproj -c Release
 
 ## 사용법
 
-프로퍼티를 자동으로 구현하고자 하는 타입에는 `partial` 한정자를 추가해야 합니다. 필드에 `Get` 또는 `GetSet` 어트리뷰트를 적용하여 프로퍼티를 생성할 수 있습니다. `AutoProperty`를 타입에 선언하는 것으로 공통 옵션을 지정할 수 있습니다.
-
-```csharp
-using Macaron.PropertyAccessor;
-
-[AutoProperty]
-public partial class Foo
-{
-}
-```
-
-`AutoProperty` 어트리뷰트는 지정된 타입에만 적용됩니다. 중첩된 타입에는 적용되지 않습니다.
-
-```csharp
-using Macaron.PropertyAccessor;
-
-[AutoProperty]
-public partial class Foo
-{
-    public partial class Bar
-    {
-        [Get]
-        private int _baz;
-    }
-}
-```
-
-위 코드에서도 `_baz`에 대한 프로퍼티는 생성되지만, 외부 타입의 `AutoProperty` 옵션은 적용되지 않습니다. `Bar`에 공통 옵션을 적용하려면 `Bar` 선언에도 `AutoProperty` 어트리뷰트를 적용해야 합니다.
+프로퍼티를 생성할 타입에는 `partial` 한정자를 추가해야 합니다. 필드에 `Get` 또는 `GetSet` 어트리뷰트를 적용하여 프로퍼티를 생성할 수 있습니다. 타입 안에서 공통으로 사용할 접근 한정자와 이름 규칙은 `PropertyGenerationDefaults` 어트리뷰트로 지정할 수 있습니다.
 
 ### Get, GetSet 어트리뷰트를 사용하기
 
@@ -51,7 +24,6 @@ public partial class Foo
 ```csharp
 using Macaron.PropertyAccessor;
 
-[AutoProperty]
 public partial class Foo
 {
     [Get]
@@ -102,7 +74,6 @@ partial class Foo
 ```csharp
 using Macaron.PropertyAccessor;
 
-[AutoProperty]
 public partial class Foo
 {
     [Get(typeof(int))]
@@ -132,20 +103,20 @@ partial class Foo
 
 명시적 참조 변환이나 언박싱처럼 컴파일은 가능하지만 실제 값에 따라 실패할 수 있는 변환은 프로퍼티 접근 중 `InvalidCastException`을 발생시킬 수 있습니다.
 
-### AutoProperty 옵션
+### PropertyGenerationDefaults 옵션
 
-`AutoProperty`는 다음과 같은 옵션을 지정할 수 있습니다.
+`PropertyGenerationDefaults`는 해당 타입에서 생성되는 프로퍼티에 적용할 기본 옵션을 지정합니다.
 
 - `accessModifier` PropertyAccessModifier: 프로퍼티를 생성할 때 사용할 접근 한정자를 지정합니다. 기본값은 `Public`입니다.
-- `prefix` string: 필드 이름에서 제거할 접두어를 나타내는 정규식 문자열입니다. 기본값은 `(_|m_)`입니다.
+- `prefixPattern` string: 필드 이름에서 제거할 접두어를 나타내는 정규식 문자열입니다. 기본값은 `^(_|m_)`입니다.
 - `namingRule` PropertyNamingRule: 접두어를 제거한 필드 이름을 어떻게 변경할지 결정합니다. 기본값은 `PascalCase`입니다.
 
 ```csharp
 using Macaron.PropertyAccessor;
 
-[AutoProperty(
+[PropertyGenerationDefaults(
     accessModifier: PropertyAccessModifier.Public,
-    prefix: "f",
+    prefixPattern: "f",
     namingRule: PropertyNamingRule.CamelCase
 )]
 public partial class Foo
@@ -170,14 +141,14 @@ partial class Foo
 }
 ```
 
-중첩된 타입에 선언된 `AutoProperty`의 옵션은 외부에 선언된 `AutoProperty` 어트리뷰트의 영향을 받지 않습니다.
+`PropertyGenerationDefaults`는 지정된 타입에만 적용되며 중첩 타입에는 상속되지 않습니다.
 
 ```csharp
 using Macaron.PropertyAccessor;
 
-[AutoProperty(
+[PropertyGenerationDefaults(
     accessModifier: PropertyAccessModifier.Public,
-    prefix: "f",
+    prefixPattern: "f",
     namingRule: PropertyNamingRule.CamelCase
 )]
 public partial class Foo
@@ -186,10 +157,9 @@ public partial class Foo
     [Get]
     private string fName;
  
-    [AutoProperty]
     public partial class Bar
     {
-        // 외부에 선언된 AutoProperty의 설정을 적용하지 않기 때문에 프로퍼티 이름은 FAge가 됩니다.
+        // 외부 타입의 기본 설정을 적용하지 않기 때문에 프로퍼티 이름은 FAge가 됩니다.
         [Get]
         public int fAge;
     }
@@ -198,12 +168,12 @@ public partial class Foo
 
 #### 필드별 이름과 접근 한정자 지정하기
 
-필드별 프로퍼티 이름과 접근 한정자는 `Get` 또는 `GetSet` 어트리뷰트에서 지정할 수 있습니다. 지정하지 않은 값은 타입에 적용된 `AutoProperty` 옵션을 따릅니다.
+필드별 프로퍼티 이름과 접근 한정자는 `Get` 또는 `GetSet` 어트리뷰트에서 지정할 수 있습니다. 지정하지 않은 값은 타입에 적용된 `PropertyGenerationDefaults` 옵션을 따릅니다.
 
 ```csharp
 using Macaron.PropertyAccessor;
 
-[AutoProperty(accessModifier: PropertyAccessModifier.Protected)]
+[PropertyGenerationDefaults(accessModifier: PropertyAccessModifier.Protected)]
 public partial class Foo
 {
     [Get(name: "name")]

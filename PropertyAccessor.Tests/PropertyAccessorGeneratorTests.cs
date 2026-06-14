@@ -72,7 +72,7 @@ public class PropertyAccessorGeneratorTests
     }
 
     [Test]
-    public void Should_GenerateGet_When_ClassIsNotMarkedWithAutoProperty()
+    public void Should_GenerateGet_When_TypeHasNoPropertyGenerationDefaults()
     {
         AssertGeneratedCode(
             sourceCode:
@@ -106,7 +106,7 @@ public class PropertyAccessorGeneratorTests
     }
 
     [Test]
-    public void Should_GenerateGetSet_When_ClassIsNotMarkedWithAutoProperty()
+    public void Should_GenerateGetSet_When_TypeHasNoPropertyGenerationDefaults()
     {
         AssertGeneratedCode(
             sourceCode:
@@ -150,7 +150,6 @@ public class PropertyAccessorGeneratorTests
 
             public interface IBar<T> { }
 
-            [AutoProperty]
             public partial class Foo
             {
                 private int _answer0 = 42;
@@ -227,7 +226,6 @@ public class PropertyAccessorGeneratorTests
             """
             namespace Macaron.PropertyAccessor.Tests;
 
-            [AutoProperty]
             public partial class Foo
             {
                 private int _answer0 = 42;
@@ -301,7 +299,6 @@ public class PropertyAccessorGeneratorTests
             """
             namespace Macaron.PropertyAccessor.Tests;
 
-            [AutoProperty]
             public partial class Foo
             {
                 [GetSet]
@@ -337,7 +334,6 @@ public class PropertyAccessorGeneratorTests
             """
             namespace Macaron.PropertyAccessor.Tests;
 
-            [AutoProperty]
             public partial class Foo
             {
                 [Get(typeof(int), PropertyAccessModifier.Private, "ConvertedAnswer")]
@@ -385,7 +381,6 @@ public class PropertyAccessorGeneratorTests
                 public static implicit operator Celsius(Fahrenheit value) => default;
             }
 
-            [AutoProperty]
             public partial class Foo
             {
                 [Get(typeof(Fahrenheit))]
@@ -432,7 +427,6 @@ public class PropertyAccessorGeneratorTests
                 public static implicit operator Container(Value value) => new();
             }
 
-            [AutoProperty]
             public partial class Foo
             {
                 [Get(typeof(Container))]
@@ -470,7 +464,6 @@ public class PropertyAccessorGeneratorTests
             """
             namespace Macaron.PropertyAccessor.Tests;
 
-            [AutoProperty]
             public partial class Foo
             {
                 [Get(typeof(int))]
@@ -504,7 +497,6 @@ public class PropertyAccessorGeneratorTests
             {
             }
 
-            [AutoProperty]
             public partial struct Foo<T>
             {
                 [GetSet]
@@ -549,7 +541,11 @@ public class PropertyAccessorGeneratorTests
             """
             namespace Macaron.PropertyAccessor.Tests;
 
-            [AutoProperty(accessModifier: PropertyAccessModifier.Protected, prefix: "m", namingRule: PropertyNamingRule.CamelCase)]
+            [PropertyGenerationDefaults(
+                accessModifier: PropertyAccessModifier.Protected,
+                prefixPattern: "m",
+                namingRule: PropertyNamingRule.CamelCase
+            )]
             public partial class Foo
             {
                 [Get]
@@ -584,7 +580,11 @@ public class PropertyAccessorGeneratorTests
             """
             namespace Macaron.PropertyAccessor.Tests;
 
-            [AutoProperty(accessModifier: PropertyAccessModifier.Protected, prefix: "m", namingRule: PropertyNamingRule.CamelCase)]
+            [PropertyGenerationDefaults(
+                accessModifier: PropertyAccessModifier.Protected,
+                prefixPattern: "m",
+                namingRule: PropertyNamingRule.CamelCase
+            )]
             public partial class Foo
             {
                 [Get(name: "bar")]
@@ -636,7 +636,6 @@ public class PropertyAccessorGeneratorTests
             """
             namespace Macaron.PropertyAccessor.Tests;
 
-            [AutoProperty]
             public partial class Foo
             {
                 private int _answer = 42;
@@ -657,7 +656,6 @@ public class PropertyAccessorGeneratorTests
             """
             namespace Macaron.PropertyAccessor.Tests;
 
-            [AutoProperty]
             public partial class Foo
             {
                 [Get] private readonly int _ = null!;
@@ -678,7 +676,6 @@ public class PropertyAccessorGeneratorTests
             """
             namespace Macaron.PropertyAccessor.Tests;
 
-            [AutoProperty]
             public partial class Foo
             {
                 [Get] private readonly int Answer = null!;
@@ -699,7 +696,7 @@ public class PropertyAccessorGeneratorTests
             """
             namespace Macaron.PropertyAccessor.Tests;
 
-            [AutoProperty(prefix: "[invalid")]
+            [PropertyGenerationDefaults(prefixPattern: "[invalid")]
             public partial class Foo
             {
                 [Get]
@@ -717,17 +714,16 @@ public class PropertyAccessorGeneratorTests
     }
 
     [Test]
-    public void Should_ReportDiagnostic_When_FieldLevelAutoPropertyIsUsed()
+    public void Should_ReportDiagnostic_When_FieldLevelPropertyGenerationDefaultsIsUsed()
     {
         AssertGeneratedCode(
             sourceCode:
             """
             namespace Macaron.PropertyAccessor.Tests;
 
-            [AutoProperty]
             public partial class Foo
             {
-                [AutoProperty(prefix: "_"), Get]
+                [PropertyGenerationDefaults(prefixPattern: "_"), Get]
                 private int _answer = 42;
             }
             """,
@@ -761,7 +757,7 @@ public class PropertyAccessorGeneratorTests
             """
             namespace Macaron.PropertyAccessor.Tests;
 
-            [AutoProperty(prefix: "")]
+            [PropertyGenerationDefaults(prefixPattern: "")]
             public partial class Foo
             {
                 [Get]
@@ -800,7 +796,7 @@ public class PropertyAccessorGeneratorTests
             """
             namespace Macaron.PropertyAccessor.Tests;
 
-            [AutoProperty(prefix: @"^(m_|_|s_)")]
+            [PropertyGenerationDefaults(prefixPattern: @"^(m_|_|s_)")]
             public partial class Foo
             {
                 [Get]
@@ -857,7 +853,6 @@ public class PropertyAccessorGeneratorTests
             """
             namespace Macaron.PropertyAccessor.Tests;
 
-            [AutoProperty]
             public partial class Foo
             {
                 [Get]
@@ -894,19 +889,16 @@ public class PropertyAccessorGeneratorTests
     }
 
     [Test]
-    public void Should_NotApplyAutoProperty_To_NestedTypes_ByDefault()
+    public void Should_NotInheritPropertyGenerationDefaults_From_ContainingType()
     {
         AssertGeneratedCode(
             sourceCode:
             """
             namespace Macaron.PropertyAccessor.Tests;
 
-            [AutoProperty]
+            [PropertyGenerationDefaults(accessModifier: PropertyAccessModifier.Protected)]
             public partial class Outer
             {
-                [Get]
-                private int _outerField = 1;
-
                 public partial class Inner
                 {
                     [Get]
@@ -923,9 +915,12 @@ public class PropertyAccessorGeneratorTests
             {
                 partial class Outer
                 {
-                    public int OuterField
+                    partial class Inner
                     {
-                        get => _outerField;
+                        public int InnerField
+                        {
+                            get => _innerField;
+                        }
                     }
                 }
             }
@@ -935,14 +930,14 @@ public class PropertyAccessorGeneratorTests
     }
 
     [Test]
-    public void Should_GenerateSingleSource_When_AutoPropertyTypeHasMultiplePartialDeclarations()
+    public void Should_GenerateSingleSource_When_TypeWithPropertyGenerationDefaultsHasMultiplePartialDeclarations()
     {
         AssertGeneratedCode(
             sourceCode:
             """
             namespace Macaron.PropertyAccessor.Tests;
 
-            [AutoProperty]
+            [PropertyGenerationDefaults(accessModifier: PropertyAccessModifier.Protected)]
             public partial class Foo
             {
                 [Get]
@@ -964,12 +959,12 @@ public class PropertyAccessorGeneratorTests
             {
                 partial class Foo
                 {
-                    public int Answer
+                    protected int Answer
                     {
                         get => _answer;
                     }
 
-                    public string Message
+                    protected string Message
                     {
                         get => _message;
                     }
@@ -984,7 +979,7 @@ public class PropertyAccessorGeneratorTests
     }
 
     [Test]
-    public void Should_GenerateSingleSource_When_TypeWithoutAutoPropertyHasMultiplePartialDeclarations()
+    public void Should_GenerateSingleSource_When_TypeWithoutPropertyGenerationDefaultsHasMultiplePartialDeclarations()
     {
         AssertGeneratedCode(
             sourceCode:
@@ -1033,7 +1028,7 @@ public class PropertyAccessorGeneratorTests
     }
 
     [Test]
-    public void Should_ApplyAutoProperty_When_NestedTypeIsExplicitlyMarked()
+    public void Should_ApplyPropertyGenerationDefaults_When_NestedTypeIsExplicitlyMarked()
     {
         AssertGeneratedCode(
             sourceCode:
@@ -1044,7 +1039,7 @@ public class PropertyAccessorGeneratorTests
             {
                 private int _outerField = 1;
 
-                [AutoProperty]
+                [PropertyGenerationDefaults(accessModifier: PropertyAccessModifier.Internal)]
                 public partial class Inner
                 {
                     [Get]
@@ -1063,7 +1058,7 @@ public class PropertyAccessorGeneratorTests
                 {
                     partial class Inner
                     {
-                        public int InnerField
+                        internal int InnerField
                         {
                             get => _innerField;
                         }
@@ -1089,7 +1084,6 @@ public class PropertyAccessorGeneratorTests
             {
                 public partial record Container<TContainer>
                 {
-                    [AutoProperty]
                     public partial struct Inner<TInner>
                     {
                         [Get]
@@ -1135,14 +1129,12 @@ public class PropertyAccessorGeneratorTests
             """
             namespace Macaron.PropertyAccessor.Tests;
 
-            [AutoProperty]
             public partial record Person
             {
                 [Get]
                 private string _name = "";
             }
 
-            [AutoProperty]
             public readonly partial record struct Point
             {
                 [Get]
@@ -1183,7 +1175,6 @@ public class PropertyAccessorGeneratorTests
 
             namespace Macaron.PropertyAccessor.Tests;
 
-            [AutoProperty]
             public partial class GenericClass<T, U>
                 where T : class, IComparable<T>
                 where U : struct
@@ -1241,7 +1232,6 @@ public class PropertyAccessorGeneratorTests
 
             namespace Macaron.PropertyAccessor.Tests;
 
-            [AutoProperty]
             public partial class ComplexGenericClass<T>
             {
                 [GetSet]
@@ -1294,7 +1284,6 @@ public class PropertyAccessorGeneratorTests
             """
             namespace Macaron.PropertyAccessor.Tests;
 
-            [AutoProperty]
             public partial class SpecialCharacterClass
             {
                 [Get]

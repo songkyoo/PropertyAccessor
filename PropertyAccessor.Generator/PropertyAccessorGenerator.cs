@@ -15,7 +15,7 @@ namespace Macaron.PropertyAccessor;
 public sealed class PropertyAccessorGenerator : IIncrementalGenerator
 {
     #region Constants
-    private const string AutoPropertyAttributeString = "Macaron.PropertyAccessor.AutoPropertyAttribute";
+    private const string PropertyGenerationDefaultsAttributeString = "Macaron.PropertyAccessor.PropertyGenerationDefaultsAttribute";
     private const string GetAttributeString = "Macaron.PropertyAccessor.GetAttribute";
     private const string GetSetAttributeString = "Macaron.PropertyAccessor.GetSetAttribute";
     #endregion
@@ -34,7 +34,7 @@ public sealed class PropertyAccessorGenerator : IIncrementalGenerator
     private sealed record TypeContext(
         INamedTypeSymbol Symbol,
         PropertyAccessModifier AccessModifier,
-        Regex Prefix,
+        Regex PrefixRegex,
         PropertyNamingRule NamingRule,
         CSharpCompilation Compilation
     );
@@ -98,7 +98,7 @@ public sealed class PropertyAccessorGenerator : IIncrementalGenerator
         TypeContext typeContext
     )
     {
-        var (typeSymbol, accessModifier, prefix, namingRule, compilation) = typeContext;
+        var (typeSymbol, accessModifier, prefixRegex, namingRule, compilation) = typeContext;
 
         return typeSymbol
             .GetMembers()
@@ -107,7 +107,7 @@ public sealed class PropertyAccessorGenerator : IIncrementalGenerator
             .Select(symbol => GetGenerationContext(
                 symbol,
                 accessModifier,
-                prefix,
+                prefixRegex,
                 namingRule,
                 compilation
             ))
@@ -129,7 +129,7 @@ public sealed class PropertyAccessorGenerator : IIncrementalGenerator
     private static (PropertyContext?, ImmutableArray<Diagnostic>) GetGenerationContext(
         IFieldSymbol fieldSymbol,
         PropertyAccessModifier accessModifier,
-        Regex prefix,
+        Regex prefixRegex,
         PropertyNamingRule namingRule,
         CSharpCompilation compilation
     )
@@ -218,14 +218,14 @@ public sealed class PropertyAccessorGenerator : IIncrementalGenerator
         var explicitPropertyName = GetConstructorArgumentValue(shapeAttribute, usesGetAttribute ? 2 : 1) as string;
         var propertyName = !string.IsNullOrWhiteSpace(explicitPropertyName)
             ? explicitPropertyName!
-            : GetPropertyName(fieldName, prefix, namingRule);
+            : GetPropertyName(fieldName, prefixRegex, namingRule);
 
         if (propertyName.Length < 1)
         {
             diagnosticsBuilder.Add(Diagnostic.Create(
                 descriptor: InvalidPropertyNameAfterPrefixRemovalRule,
                 location: fieldSymbol.Locations.FirstOrDefault(),
-                messageArgs: [fieldName, prefix]
+                messageArgs: [fieldName, prefixRegex]
             ));
 
             return (null, diagnosticsBuilder.ToImmutable());
@@ -236,7 +236,7 @@ public sealed class PropertyAccessorGenerator : IIncrementalGenerator
             diagnosticsBuilder.Add(Diagnostic.Create(
                 descriptor: PropertyNameSameAsFieldNameRule,
                 location: fieldSymbol.Locations.FirstOrDefault(),
-                messageArgs: [fieldName, prefix, propertyName]
+                messageArgs: [fieldName, prefixRegex, propertyName]
             ));
 
             return (null, diagnosticsBuilder.ToImmutable());
@@ -259,9 +259,9 @@ public sealed class PropertyAccessorGenerator : IIncrementalGenerator
         );
 
         #region Local Functions
-        static string GetPropertyName(string fieldName, Regex prefix, PropertyNamingRule namingRule)
+        static string GetPropertyName(string fieldName, Regex prefixRegex, PropertyNamingRule namingRule)
         {
-            var prefixRemovedName = prefix.Replace(input: fieldName, replacement: "", count: 1);
+            var prefixRemovedName = prefixRegex.Replace(input: fieldName, replacement: "", count: 1);
 
             if (prefixRemovedName.Length < 1)
             {
@@ -370,7 +370,7 @@ public sealed class PropertyAccessorGenerator : IIncrementalGenerator
         return isDefined && accessModifier != PropertyAccessModifier.Default ? accessModifier : defaultValue;
     }
 
-    private static Regex? GetPrefix(object? value, Regex? defaultValue = null)
+    private static Regex? GetPrefixRegex(object? value, Regex? defaultValue = null)
     {
         try
         {
@@ -438,11 +438,11 @@ public sealed class PropertyAccessorGenerator : IIncrementalGenerator
                         return ((TypeContext?)null, diagnosticsBuilder.ToImmutable());
                     }
 
-                    var attributeSymbol = typeSymbol
+                    var defaultsAttribute = typeSymbol
                         .GetAttributes()
                         .FirstOrDefault(attributeData =>
                         {
-                            return attributeData.AttributeClass?.ToDisplayString() == AutoPropertyAttributeString;
+                            return attributeData.AttributeClass?.ToDisplayString() == PropertyGenerationDefaultsAttributeString;
                         });
 
                     var hasAccessorField = typeSymbol
@@ -460,15 +460,15 @@ public sealed class PropertyAccessorGenerator : IIncrementalGenerator
                         return ((TypeContext?)null, diagnosticsBuilder.ToImmutable());
                     }
 
-                    var prefixArgument = attributeSymbol?.ConstructorArguments[1].Value;
-                    var typeLevelPrefix = GetPrefix(prefixArgument);
+                    var prefixPatternArgument = defaultsAttribute?.ConstructorArguments[1].Value;
+                    var typeLevelPrefixRegex = GetPrefixRegex(prefixPatternArgument);
 
-                    if (typeLevelPrefix == null)
+                    if (typeLevelPrefixRegex == null)
                     {
                         diagnosticsBuilder.Add(Diagnostic.Create(
                             descriptor: InvalidPrefixPatternRule,
-                            location: attributeSymbol?.ApplicationSyntaxReference?.GetSyntax().GetLocation(),
-                            messageArgs: [prefixArgument]
+                            location: defaultsAttribute?.ApplicationSyntaxReference?.GetSyntax().GetLocation(),
+                            messageArgs: [prefixPatternArgument]
                         ));
 
                         return ((TypeContext?)null, diagnosticsBuilder.ToImmutable());
@@ -477,9 +477,9 @@ public sealed class PropertyAccessorGenerator : IIncrementalGenerator
                     return (
                         new TypeContext(
                             Symbol: typeSymbol,
-                            AccessModifier: GetAccessModifier(attributeSymbol?.ConstructorArguments[0].Value),
-                            Prefix: typeLevelPrefix,
-                            NamingRule: GetNamingRule(attributeSymbol?.ConstructorArguments[2].Value),
+                            AccessModifier: GetAccessModifier(defaultsAttribute?.ConstructorArguments[0].Value),
+                            PrefixRegex: typeLevelPrefixRegex,
+                            NamingRule: GetNamingRule(defaultsAttribute?.ConstructorArguments[2].Value),
                             Compilation: (CSharpCompilation)semanticModel.Compilation
                         ),
                         diagnosticsBuilder.ToImmutable()
