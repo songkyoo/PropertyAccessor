@@ -482,7 +482,7 @@ public class PropertyAccessorGeneratorTests
         );
 
         Assert.That(diagnostics, Has.Some.Matches<Diagnostic>(diagnostic =>
-            diagnostic.Id == "MPROP0008" &&
+            diagnostic.Id == "MPROP0005" &&
             diagnostic.GetMessage().Contains("string") &&
             diagnostic.GetMessage().Contains("int")
         ));
@@ -667,7 +667,7 @@ public class PropertyAccessorGeneratorTests
             out var diagnostics
         );
 
-        Assert.That(diagnostics, Has.Some.Matches<Diagnostic>(diagnostic => diagnostic.Id == "MPROP0004"));
+        Assert.That(diagnostics, Has.Some.Matches<Diagnostic>(diagnostic => diagnostic.Id == "MPROP0001"));
     }
 
     [Test]
@@ -688,7 +688,7 @@ public class PropertyAccessorGeneratorTests
             out var diagnostics
         );
 
-        Assert.That(diagnostics, Has.Some.Matches<Diagnostic>(diagnostic => diagnostic.Id == "MPROP0005"));
+        Assert.That(diagnostics, Has.Some.Matches<Diagnostic>(diagnostic => diagnostic.Id == "MPROP0002"));
     }
 
     [Test]
@@ -711,7 +711,7 @@ public class PropertyAccessorGeneratorTests
         );
 
         Assert.That(diagnostics, Has.Some.Matches<Diagnostic>(diagnostic =>
-            diagnostic.Id == "MPROP0006" &&
+            diagnostic.Id == "MPROP0003" &&
             diagnostic.GetMessage().Contains("[invalid")
         ));
     }
@@ -846,7 +846,7 @@ public class PropertyAccessorGeneratorTests
             out var diagnostics
         );
 
-        Assert.That(diagnostics, Has.Some.Matches<Diagnostic>(diagnostic => diagnostic.Id == "MPROP0007"));
+        Assert.That(diagnostics, Has.Some.Matches<Diagnostic>(diagnostic => diagnostic.Id == "MPROP0004"));
     }
 
     [Test]
@@ -890,7 +890,7 @@ public class PropertyAccessorGeneratorTests
             out var diagnostics
         );
 
-        Assert.That(diagnostics.Count(diagnostic => diagnostic.Id == "MPROP0007"), Is.EqualTo(2));
+        Assert.That(diagnostics.Count(diagnostic => diagnostic.Id == "MPROP0004"), Is.EqualTo(2));
     }
 
     [Test]
