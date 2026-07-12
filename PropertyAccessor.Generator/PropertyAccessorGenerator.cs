@@ -4,6 +4,7 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 
+using static Macaron.PropertyAccessor.PropertyAccessorKind;
 using static Macaron.PropertyAccessor.SourceGenerationHelpers;
 using static Microsoft.CodeAnalysis.CSharp.SyntaxFacts;
 using static Microsoft.CodeAnalysis.SymbolDisplayFormat;
@@ -23,44 +24,117 @@ public sealed class PropertyAccessorGenerator : IIncrementalGenerator
     #region Static
     private static readonly Regex DefaultRegex = new(pattern: "^(_|m_)", RegexOptions.Compiled);
 
-    private static AnalysisResult<TypeContext>? GetTypeContext(
-        GeneratorSyntaxContext generatorSyntaxContext,
+    private static AccessorAttributeContext? GetAccessorAttributeContext(
+        GeneratorAttributeSyntaxContext generatorAttributeSyntaxContext,
+        PropertyAccessorKind kind
+    )
+    {
+        if (generatorAttributeSyntaxContext.Attributes.Length != 1)
+        {
+            return null;
+        }
+
+        return generatorAttributeSyntaxContext is
+            {
+                TargetSymbol: IFieldSymbol fieldSymbol,
+                SemanticModel.Compilation: CSharpCompilation compilation,
+            }
+            ? new AccessorAttributeContext(fieldSymbol, kind, compilation)
+            : null;
+    }
+
+    private static PropertyGenerationDefaultsAttributeContext? GetPropertyGenerationDefaultsAttributeContext(
+        GeneratorAttributeSyntaxContext generatorAttributeSyntaxContext
+    )
+    {
+        if (generatorAttributeSyntaxContext.Attributes.Length != 1)
+        {
+            return null;
+        }
+
+        return generatorAttributeSyntaxContext.TargetSymbol is INamedTypeSymbol typeSymbol
+            ? new PropertyGenerationDefaultsAttributeContext(
+                typeSymbol,
+                generatorAttributeSyntaxContext.Attributes
+            )
+            : null;
+    }
+
+    private static ImmutableArray<AnalysisResult<TypeContext>> GetTypeContexts(
+        ImmutableArray<AccessorAttributeContext> getAttributeContexts,
+        ImmutableArray<AccessorAttributeContext> getSetAttributeContexts,
+        ImmutableArray<PropertyGenerationDefaultsAttributeContext> defaultsAttributeContexts,
         CancellationToken cancellationToken
     )
     {
-        var semanticModel = generatorSyntaxContext.SemanticModel;
+        var compilationByType = new Dictionary<INamedTypeSymbol, CSharpCompilation>(
+            SymbolEqualityComparer.Default
+        );
+        var defaultsAttributeByType = new Dictionary<INamedTypeSymbol, AttributeData>(
+            SymbolEqualityComparer.Default
+        );
 
-        if (semanticModel.GetDeclaredSymbol(
-                generatorSyntaxContext.Node,
+        AddAccessorAttributeContexts(getAttributeContexts);
+        AddAccessorAttributeContexts(getSetAttributeContexts);
+
+        foreach (var defaultsAttributeContext in defaultsAttributeContexts)
+        {
+            if (defaultsAttributeByType.ContainsKey(defaultsAttributeContext.Symbol)
+                || defaultsAttributeContext.Attributes.IsDefaultOrEmpty
+            )
+            {
+                continue;
+            }
+
+            defaultsAttributeByType.Add(
+                defaultsAttributeContext.Symbol,
+                defaultsAttributeContext.Attributes[0]
+            );
+        }
+
+        var builder = ImmutableArray.CreateBuilder<AnalysisResult<TypeContext>>(compilationByType.Count);
+
+        foreach (var entry in compilationByType)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            var typeSymbol = entry.Key;
+            var compilation = entry.Value;
+
+            defaultsAttributeByType.TryGetValue(typeSymbol, out var defaultsAttribute);
+            builder.Add(GetTypeContext(
+                typeSymbol,
+                compilation,
+                defaultsAttribute,
                 cancellationToken
-            ) is not INamedTypeSymbol typeSymbol
-        )
-        {
-            return null;
+            ));
         }
 
-        var defaultsAttribute = typeSymbol
-            .GetAttributes()
-            .FirstOrDefault(attributeData =>
-            {
-                return attributeData.AttributeClass?.ToDisplayString() == PropertyGenerationDefaultsAttributeMetadataName;
-            });
+        return builder.ToImmutable();
 
-        var hasAccessorField = typeSymbol
-            .GetMembers()
-            .OfType<IFieldSymbol>()
-            .Any(fieldSymbol => fieldSymbol.GetAttributes().Any(attributeData =>
-            {
-                var attributeName = attributeData.AttributeClass?.ToDisplayString();
-
-                return attributeName is GetAttributeMetadataName or GetSetAttributeMetadataName;
-            }));
-
-        if (!hasAccessorField)
+        #region Local Functions
+        void AddAccessorAttributeContexts(ImmutableArray<AccessorAttributeContext> accessorAttributeContexts)
         {
-            return null;
-        }
+            foreach (var accessorAttributeContext in accessorAttributeContexts)
+            {
+                var typeSymbol = accessorAttributeContext.Symbol.ContainingType;
 
+                if (!compilationByType.ContainsKey(typeSymbol))
+                {
+                    compilationByType.Add(typeSymbol, accessorAttributeContext.Compilation);
+                }
+            }
+        }
+        #endregion
+    }
+
+    private static AnalysisResult<TypeContext> GetTypeContext(
+        INamedTypeSymbol typeSymbol,
+        CSharpCompilation compilation,
+        AttributeData? defaultsAttribute,
+        CancellationToken cancellationToken
+    )
+    {
         var prefixPatternArgument = defaultsAttribute?.ConstructorArguments[1].Value;
         var typeLevelPrefixRegex = GetPrefixRegex(prefixPatternArgument);
 
@@ -81,7 +155,7 @@ public sealed class PropertyAccessorGenerator : IIncrementalGenerator
             AccessModifier: GetAccessModifier(defaultsAttribute?.ConstructorArguments[0].Value),
             PrefixRegex: typeLevelPrefixRegex,
             NamingRule: GetNamingRule(defaultsAttribute?.ConstructorArguments[2].Value),
-            Compilation: (CSharpCompilation)semanticModel.Compilation
+            Compilation: compilation
         ));
     }
 
@@ -144,7 +218,7 @@ public sealed class PropertyAccessorGenerator : IIncrementalGenerator
                     getAttribute = attributeData;
                     if (accessorKind == PropertyAccessorKind.None)
                     {
-                        accessorKind = PropertyAccessorKind.Get;
+                        accessorKind = Get;
                     }
 
                     break;
@@ -152,7 +226,7 @@ public sealed class PropertyAccessorGenerator : IIncrementalGenerator
                 case GetSetAttributeMetadataName:
                 {
                     getSetAttribute = attributeData;
-                    accessorKind = PropertyAccessorKind.GetSet;
+                    accessorKind = GetSet;
 
                     break;
                 }
@@ -176,7 +250,7 @@ public sealed class PropertyAccessorGenerator : IIncrementalGenerator
         }
 
         var shapeAttribute = getSetAttribute ?? getAttribute;
-        if (accessorKind == PropertyAccessorKind.Get &&
+        if (accessorKind == Get &&
             getAttribute is { ConstructorArguments.Length: > 0 } &&
             getAttribute.ConstructorArguments[0].Value is ITypeSymbol propertyTypeSymbol
         )
@@ -296,7 +370,7 @@ public sealed class PropertyAccessorGenerator : IIncrementalGenerator
         builder.Add($"{GetAccessorModifier(accessModifier)} {propertyTypeName} {escapedPropertyName}");
         builder.Add("{");
 
-        if (accessorKind is PropertyAccessorKind.Get or PropertyAccessorKind.GetSet)
+        if (accessorKind is Get or GetSet)
         {
             var getterExpression = escapedFieldName;
 
@@ -308,7 +382,7 @@ public sealed class PropertyAccessorGenerator : IIncrementalGenerator
             builder.Add($"{Indent}get => {getterExpression};");
         }
 
-        if (accessorKind == PropertyAccessorKind.GetSet)
+        if (accessorKind == GetSet)
         {
             builder.Add($"{Indent}{(isInitAccessor ? "init" : "set")} => {escapedFieldName} = value;");
         }
@@ -392,33 +466,62 @@ public sealed class PropertyAccessorGenerator : IIncrementalGenerator
     #region IIncrementalGenerator Interface
     public void Initialize(IncrementalGeneratorInitializationContext context)
     {
-        var analysisResult = context
+        var getAttributeContextProvider = context
             .SyntaxProvider
-            .CreateSyntaxProvider(
-                predicate: static (syntaxNode, _) =>
-                {
-                    return syntaxNode
-                        is TypeDeclarationSyntax typeDeclaration
-                        and (ClassDeclarationSyntax or StructDeclarationSyntax or RecordDeclarationSyntax)
-                        && (
-                            typeDeclaration.AttributeLists.Count > 0
-                            || typeDeclaration
-                                .Members
-                                .OfType<FieldDeclarationSyntax>()
-                                .Any(fieldDeclaration => fieldDeclaration.AttributeLists.Count > 0)
-                        );
-                },
-                transform: static (generatorSyntaxContext, cancellationToken) => GetTypeContext(
-                    generatorSyntaxContext,
-                    cancellationToken
+            .ForAttributeWithMetadataName(
+                fullyQualifiedMetadataName: GetAttributeMetadataName,
+                predicate: static (syntaxNode, _) => syntaxNode is VariableDeclaratorSyntax,
+                transform: static (generatorAttributeSyntaxContext, _) => GetAccessorAttributeContext(
+                    generatorAttributeSyntaxContext,
+                    kind: Get
                 )
             )
-            .Where(static result => result is not null)
-            .Select(static (result, _) => result!);
-        var diagnosticProvider = analysisResult
+            .Where(static attributeContext => attributeContext != null)
+            .Select(static (attributeContext, _) => attributeContext!);
+        var getSetAttributeContextProvider = context
+            .SyntaxProvider
+            .ForAttributeWithMetadataName(
+                fullyQualifiedMetadataName: GetSetAttributeMetadataName,
+                predicate: static (syntaxNode, _) => syntaxNode is VariableDeclaratorSyntax,
+                transform: static (generatorAttributeSyntaxContext, _) => GetAccessorAttributeContext(
+                    generatorAttributeSyntaxContext,
+                    kind: GetSet
+                )
+            )
+            .Where(static attributeContext => attributeContext != null)
+            .Select(static (attributeContext, _) => attributeContext!);
+        var defaultsAttributeContextProvider = context
+            .SyntaxProvider
+            .ForAttributeWithMetadataName(
+                fullyQualifiedMetadataName: PropertyGenerationDefaultsAttributeMetadataName,
+                predicate: static (syntaxNode, _) => syntaxNode is TypeDeclarationSyntax,
+                transform: static (generatorAttributeSyntaxContext, _) => GetPropertyGenerationDefaultsAttributeContext(
+                    generatorAttributeSyntaxContext
+                )
+            )
+            .Where(static attributeContext => attributeContext != null)
+            .Select(static (attributeContext, _) => attributeContext!);
+
+        var analysisResultProvider = getAttributeContextProvider
+            .Collect()
+            .Combine(getSetAttributeContextProvider.Collect())
+            .Combine(defaultsAttributeContextProvider.Collect())
+            .Select(static (attributeContexts, cancellationToken) =>
+            {
+                var ((getAttributeContexts, getSetAttributeContexts), defaultsAttributeContexts) = attributeContexts;
+
+                return GetTypeContexts(
+                    getAttributeContexts,
+                    getSetAttributeContexts,
+                    defaultsAttributeContexts,
+                    cancellationToken
+                );
+            })
+            .SelectMany(static (analysisResults, _) => analysisResults);
+        var diagnosticProvider = analysisResultProvider
             .Where(static result => result is AnalysisResult<TypeContext>.Failure)
             .SelectMany(static (result, _) => ((AnalysisResult<TypeContext>.Failure)result).Diagnostics);
-        var typeContextProvider = analysisResult
+        var typeContextProvider = analysisResultProvider
             .Where(static result => result is AnalysisResult<TypeContext>.Success)
             .Select(static (result, _) => ((AnalysisResult<TypeContext>.Success)result).Model);
 
@@ -426,57 +529,47 @@ public sealed class PropertyAccessorGenerator : IIncrementalGenerator
         {
             sourceProductionContext.ReportDiagnostic(diagnostic);
         });
-        context.RegisterSourceOutput(typeContextProvider.Collect(), (sourceProductionContext, typeContexts) =>
+        context.RegisterSourceOutput(typeContextProvider, static (sourceProductionContext, typeContext) =>
         {
-            var visitedTypes = new HashSet<INamedTypeSymbol>(SymbolEqualityComparer.Default);
+            var builder = ImmutableArray.CreateBuilder<string>();
 
-            foreach (var typeContext in typeContexts)
+            foreach (var propertyAnalysisResult in GetPropertyContexts(typeContext))
             {
-                if (!visitedTypes.Add(typeContext.Symbol))
+                if (propertyAnalysisResult is AnalysisResult<PropertyContext>.Failure failure)
+                {
+                    foreach (var diagnostic in failure.Diagnostics)
+                    {
+                        sourceProductionContext.ReportDiagnostic(diagnostic);
+                    }
+
+                    continue;
+                }
+
+                if (propertyAnalysisResult is not AnalysisResult<PropertyContext>.Success success)
                 {
                     continue;
                 }
 
-                var builder = ImmutableArray.CreateBuilder<string>();
-
-                foreach (var propertyAnalysisResult in GetPropertyContexts(typeContext))
+                var propertyContext = success.Model;
+                var lines = GenerateAccessorCode(propertyContext);
+                if (lines.IsEmpty)
                 {
-                    if (propertyAnalysisResult is AnalysisResult<PropertyContext>.Failure failure)
-                    {
-                        foreach (var diagnostic in failure.Diagnostics)
-                        {
-                            sourceProductionContext.ReportDiagnostic(diagnostic);
-                        }
-
-                        continue;
-                    }
-
-                    if (propertyAnalysisResult is not AnalysisResult<PropertyContext>.Success success)
-                    {
-                        continue;
-                    }
-
-                    var propertyContext = success.Model;
-                    var lines = GenerateAccessorCode(propertyContext);
-                    if (lines.IsEmpty)
-                    {
-                        continue;
-                    }
-
-                    if (builder.Count > 0)
-                    {
-                        builder.Add("");
-                    }
-
-                    builder.AddRange(lines);
+                    continue;
                 }
 
-                AddSource(
-                    context: sourceProductionContext,
-                    typeSymbol: typeContext.Symbol,
-                    lines: builder.ToImmutable()
-                );
+                if (builder.Count > 0)
+                {
+                    builder.Add("");
+                }
+
+                builder.AddRange(lines);
             }
+
+            AddSource(
+                context: sourceProductionContext,
+                typeSymbol: typeContext.Symbol,
+                lines: builder.ToImmutable()
+            );
         });
     }
     #endregion
