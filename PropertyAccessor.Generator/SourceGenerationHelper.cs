@@ -131,14 +131,13 @@ public static class SourceGenerationHelpers
 
     private static string GetHintName(INamedTypeSymbol typeSymbol)
     {
-        var assemblyName = typeSymbol.ContainingAssembly != null ? $"{typeSymbol.ContainingAssembly}," : "";
         var qualifiedName = typeSymbol.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
 
         const uint fnvPrime = 16777619;
         const uint offsetBasis = 2166136261;
 
-        var bytes = Encoding.UTF8.GetBytes($"{assemblyName}, {qualifiedName}");
-        uint hash = offsetBasis;
+        var bytes = Encoding.UTF8.GetBytes($"{qualifiedName}");
+        var hash = offsetBasis;
 
         foreach (var b in bytes)
         {

@@ -11,90 +11,81 @@ using static Microsoft.CodeAnalysis.SymbolDisplayMiscellaneousOptions;
 
 namespace Macaron.PropertyAccessor;
 
-[Generator]
+[Generator(LanguageNames.CSharp)]
 public sealed class PropertyAccessorGenerator : IIncrementalGenerator
 {
     #region Constants
-    private const string PropertyGenerationDefaultsAttributeString = "Macaron.PropertyAccessor.PropertyGenerationDefaultsAttribute";
-    private const string GetAttributeString = "Macaron.PropertyAccessor.GetAttribute";
-    private const string GetSetAttributeString = "Macaron.PropertyAccessor.GetSetAttribute";
-    #endregion
-
-    #region Enums
-    private enum PropertyAccessorKind
-    {
-        None,
-
-        Get,
-        GetSet
-    }
-    #endregion
-
-    #region Types
-    private sealed record TypeContext(
-        INamedTypeSymbol Symbol,
-        PropertyAccessModifier AccessModifier,
-        Regex PrefixRegex,
-        PropertyNamingRule NamingRule,
-        CSharpCompilation Compilation
-    );
-
-    private sealed record PropertyContext(
-        PropertyAccessModifier AccessModifier,
-        ITypeSymbol TypeSymbol,
-        string Name,
-        string FieldName,
-        PropertyAccessorKind AccessorKind,
-        bool IsInitAccessor,
-        bool GetterRequiresExplicitConversion
-    );
+    private const string PropertyGenerationDefaultsAttributeMetadataName = "Macaron.PropertyAccessor.PropertyGenerationDefaultsAttribute";
+    private const string GetAttributeMetadataName = "Macaron.PropertyAccessor.GetAttribute";
+    private const string GetSetAttributeMetadataName = "Macaron.PropertyAccessor.GetSetAttribute";
     #endregion
 
     #region Static
-    private static readonly DiagnosticDescriptor InvalidPropertyNameAfterPrefixRemovalRule = new(
-        id: "MPROP0001",
-        title: "Cannot generate property name after prefix removal",
-        messageFormat: "Field '{0}' with prefix pattern '{1}' results in an empty property name",
-        category: "Naming",
-        DiagnosticSeverity.Error,
-        isEnabledByDefault: true
-    );
-    private static readonly DiagnosticDescriptor PropertyNameSameAsFieldNameRule = new(
-        id: "MPROP0002",
-        title: "Generated property name is same as field name",
-        messageFormat: "Field '{0}' with prefix pattern '{1}' results in property name '{2}', which is the same as the field name",
-        category: "Naming",
-        DiagnosticSeverity.Warning,
-        isEnabledByDefault: true
-    );
-    private static readonly DiagnosticDescriptor InvalidPrefixPatternRule = new(
-        id: "MPROP0003",
-        title: "Invalid prefix pattern",
-        messageFormat: "Prefix pattern '{0}' is not a valid regular expression",
-        category: "Usage",
-        DiagnosticSeverity.Error,
-        isEnabledByDefault: true
-    );
-    private static readonly DiagnosticDescriptor StaticFieldNotSupportedRule = new(
-        id: "MPROP0004",
-        title: "Static fields are not supported",
-        messageFormat: "Field '{0}' must not be static",
-        category: "Usage",
-        DiagnosticSeverity.Error,
-        isEnabledByDefault: true
-    );
-    private static readonly DiagnosticDescriptor InvalidGetterConversionRule = new(
-        id: "MPROP0005",
-        title: "Field type cannot be converted to property type",
-        messageFormat: "Field '{0}' of type '{1}' cannot be cast to property type '{2}'",
-        category: "Usage",
-        DiagnosticSeverity.Error,
-        isEnabledByDefault: true
-    );
-
     private static readonly Regex DefaultRegex = new(pattern: "^(_|m_)", RegexOptions.Compiled);
 
-    private static ImmutableArray<(PropertyContext?, ImmutableArray<Diagnostic>)> GetPropertyContexts(
+    private static AnalysisResult<TypeContext>? GetTypeContext(
+        GeneratorSyntaxContext generatorSyntaxContext,
+        CancellationToken cancellationToken
+    )
+    {
+        var semanticModel = generatorSyntaxContext.SemanticModel;
+
+        if (semanticModel.GetDeclaredSymbol(
+                generatorSyntaxContext.Node,
+                cancellationToken
+            ) is not INamedTypeSymbol typeSymbol
+        )
+        {
+            return null;
+        }
+
+        var defaultsAttribute = typeSymbol
+            .GetAttributes()
+            .FirstOrDefault(attributeData =>
+            {
+                return attributeData.AttributeClass?.ToDisplayString() == PropertyGenerationDefaultsAttributeMetadataName;
+            });
+
+        var hasAccessorField = typeSymbol
+            .GetMembers()
+            .OfType<IFieldSymbol>()
+            .Any(fieldSymbol => fieldSymbol.GetAttributes().Any(attributeData =>
+            {
+                var attributeName = attributeData.AttributeClass?.ToDisplayString();
+
+                return attributeName is GetAttributeMetadataName or GetSetAttributeMetadataName;
+            }));
+
+        if (!hasAccessorField)
+        {
+            return null;
+        }
+
+        var prefixPatternArgument = defaultsAttribute?.ConstructorArguments[1].Value;
+        var typeLevelPrefixRegex = GetPrefixRegex(prefixPatternArgument);
+
+        if (typeLevelPrefixRegex == null)
+        {
+            return new AnalysisResult<TypeContext>.Failure(Diagnostic.Create(
+                descriptor: Diagnostics.InvalidPrefixPatternRule,
+                location: defaultsAttribute?
+                    .ApplicationSyntaxReference?
+                    .GetSyntax(cancellationToken)
+                    .GetLocation(),
+                messageArgs: [prefixPatternArgument]
+            ));
+        }
+
+        return new AnalysisResult<TypeContext>.Success(new TypeContext(
+            Symbol: typeSymbol,
+            AccessModifier: GetAccessModifier(defaultsAttribute?.ConstructorArguments[0].Value),
+            PrefixRegex: typeLevelPrefixRegex,
+            NamingRule: GetNamingRule(defaultsAttribute?.ConstructorArguments[2].Value),
+            Compilation: (CSharpCompilation)semanticModel.Compilation
+        ));
+    }
+
+    private static ImmutableArray<AnalysisResult<PropertyContext>> GetPropertyContexts(
         TypeContext typeContext
     )
     {
@@ -111,6 +102,8 @@ public sealed class PropertyAccessorGenerator : IIncrementalGenerator
                 namingRule,
                 compilation
             ))
+            .Where(static result => result != null)
+            .Select(static result => result!)
             .ToImmutableArray();
 
         #region Local Functions
@@ -120,13 +113,13 @@ public sealed class PropertyAccessorGenerator : IIncrementalGenerator
             {
                 var attributeName = attributeData.AttributeClass?.ToDisplayString();
 
-                return attributeName is GetAttributeString or GetSetAttributeString;
+                return attributeName is GetAttributeMetadataName or GetSetAttributeMetadataName;
             });
         }
         #endregion
     }
 
-    private static (PropertyContext?, ImmutableArray<Diagnostic>) GetGenerationContext(
+    private static AnalysisResult<PropertyContext>? GetGenerationContext(
         IFieldSymbol fieldSymbol,
         PropertyAccessModifier accessModifier,
         Regex prefixRegex,
@@ -142,13 +135,11 @@ public sealed class PropertyAccessorGenerator : IIncrementalGenerator
         var accessorKind = PropertyAccessorKind.None;
         var getterRequiresExplicitConversion = false;
 
-        var diagnosticsBuilder = ImmutableArray.CreateBuilder<Diagnostic>();
-
         foreach (var attributeData in fieldSymbol.GetAttributes())
         {
             switch (attributeData.AttributeClass?.ToDisplayString())
             {
-                case GetAttributeString:
+                case GetAttributeMetadataName:
                 {
                     getAttribute = attributeData;
                     if (accessorKind == PropertyAccessorKind.None)
@@ -158,10 +149,11 @@ public sealed class PropertyAccessorGenerator : IIncrementalGenerator
 
                     break;
                 }
-                case GetSetAttributeString:
+                case GetSetAttributeMetadataName:
                 {
                     getSetAttribute = attributeData;
                     accessorKind = PropertyAccessorKind.GetSet;
+
                     break;
                 }
             }
@@ -169,20 +161,18 @@ public sealed class PropertyAccessorGenerator : IIncrementalGenerator
 
         if (fieldSymbol.IsStatic && accessorKind != PropertyAccessorKind.None)
         {
-            diagnosticsBuilder.Add(Diagnostic.Create(
-                descriptor: StaticFieldNotSupportedRule,
+            return new AnalysisResult<PropertyContext>.Failure(Diagnostic.Create(
+                descriptor: Diagnostics.StaticFieldNotSupportedRule,
                 location: fieldSymbol.Locations.FirstOrDefault(),
                 messageArgs: [fieldName]
             ));
-
-            return (null, diagnosticsBuilder.ToImmutable());
         }
 
         var typeSymbol = fieldTypeSymbol;
 
         if (accessorKind == PropertyAccessorKind.None)
         {
-            return (null, diagnosticsBuilder.ToImmutable());
+            return null;
         }
 
         var shapeAttribute = getSetAttribute ?? getAttribute;
@@ -196,8 +186,8 @@ public sealed class PropertyAccessorGenerator : IIncrementalGenerator
 
             if (!getterConversion.Exists)
             {
-                diagnosticsBuilder.Add(Diagnostic.Create(
-                    descriptor: InvalidGetterConversionRule,
+                return new AnalysisResult<PropertyContext>.Failure(Diagnostic.Create(
+                    descriptor: Diagnostics.InvalidGetterConversionRule,
                     location: diagnosticLocation,
                     messageArgs:
                     [
@@ -206,8 +196,6 @@ public sealed class PropertyAccessorGenerator : IIncrementalGenerator
                         propertyTypeSymbol.ToDisplayString(MinimallyQualifiedFormat)
                     ]
                 ));
-
-                return (null, diagnosticsBuilder.ToImmutable());
             }
 
             typeSymbol = propertyTypeSymbol;
@@ -222,41 +210,34 @@ public sealed class PropertyAccessorGenerator : IIncrementalGenerator
 
         if (propertyName.Length < 1)
         {
-            diagnosticsBuilder.Add(Diagnostic.Create(
-                descriptor: InvalidPropertyNameAfterPrefixRemovalRule,
+            return new AnalysisResult<PropertyContext>.Failure(Diagnostic.Create(
+                descriptor: Diagnostics.InvalidPropertyNameAfterPrefixRemovalRule,
                 location: fieldSymbol.Locations.FirstOrDefault(),
                 messageArgs: [fieldName, prefixRegex]
             ));
-
-            return (null, diagnosticsBuilder.ToImmutable());
         }
 
         if (propertyName == fieldName)
         {
-            diagnosticsBuilder.Add(Diagnostic.Create(
-                descriptor: PropertyNameSameAsFieldNameRule,
+            return new AnalysisResult<PropertyContext>.Failure(Diagnostic.Create(
+                descriptor: Diagnostics.PropertyNameSameAsFieldNameRule,
                 location: fieldSymbol.Locations.FirstOrDefault(),
                 messageArgs: [fieldName, prefixRegex, propertyName]
             ));
-
-            return (null, diagnosticsBuilder.ToImmutable());
         }
 
-        return (
-            new PropertyContext(
-                AccessModifier: GetAccessModifier(
-                    GetConstructorArgumentValue(shapeAttribute, usesGetAttribute ? 1 : 0),
-                    accessModifier
-                ),
-                TypeSymbol: typeSymbol,
-                Name: propertyName,
-                FieldName: fieldName,
-                AccessorKind: accessorKind,
-                IsInitAccessor: fieldSymbol.IsReadOnly,
-                GetterRequiresExplicitConversion: getterRequiresExplicitConversion
+        return new AnalysisResult<PropertyContext>.Success( new PropertyContext(
+            AccessModifier: GetAccessModifier(
+                GetConstructorArgumentValue(shapeAttribute, usesGetAttribute ? 1 : 0),
+                accessModifier
             ),
-            diagnosticsBuilder.ToImmutable()
-        );
+            TypeSymbol: typeSymbol,
+            Name: propertyName,
+            FieldName: fieldName,
+            AccessorKind: accessorKind,
+            IsInitAccessor: fieldSymbol.IsReadOnly,
+            GetterRequiresExplicitConversion: getterRequiresExplicitConversion
+        ));
 
         #region Local Functions
         static string GetPropertyName(string fieldName, Regex prefixRegex, PropertyNamingRule namingRule)
@@ -313,7 +294,7 @@ public sealed class PropertyAccessorGenerator : IIncrementalGenerator
         var builder = ImmutableArray.CreateBuilder<string>();
 
         builder.Add($"{GetAccessorModifier(accessModifier)} {propertyTypeName} {escapedPropertyName}");
-        builder.Add($"{{");
+        builder.Add("{");
 
         if (accessorKind is PropertyAccessorKind.Get or PropertyAccessorKind.GetSet)
         {
@@ -332,7 +313,7 @@ public sealed class PropertyAccessorGenerator : IIncrementalGenerator
             builder.Add($"{Indent}{(isInitAccessor ? "init" : "set")} => {escapedFieldName} = value;");
         }
 
-        builder.Add($"}}");
+        builder.Add("}");
 
         return builder.ToImmutable();
 
@@ -411,98 +392,46 @@ public sealed class PropertyAccessorGenerator : IIncrementalGenerator
     #region IIncrementalGenerator Interface
     public void Initialize(IncrementalGeneratorInitializationContext context)
     {
-        IncrementalValuesProvider<(TypeContext?, ImmutableArray<Diagnostic>)> valuesProvider = context
+        var analysisResult = context
             .SyntaxProvider
             .CreateSyntaxProvider(
                 predicate: static (syntaxNode, _) =>
                 {
                     return syntaxNode
-                           is TypeDeclarationSyntax typeDeclaration
-                           and (ClassDeclarationSyntax or StructDeclarationSyntax or RecordDeclarationSyntax)
-                           && (
-                               typeDeclaration.AttributeLists.Count > 0 ||
-                               typeDeclaration
-                                   .Members
-                                   .OfType<FieldDeclarationSyntax>()
-                                   .Any(fieldDeclaration => fieldDeclaration.AttributeLists.Count > 0)
-                           );
+                        is TypeDeclarationSyntax typeDeclaration
+                        and (ClassDeclarationSyntax or StructDeclarationSyntax or RecordDeclarationSyntax)
+                        && (
+                            typeDeclaration.AttributeLists.Count > 0
+                            || typeDeclaration
+                                .Members
+                                .OfType<FieldDeclarationSyntax>()
+                                .Any(fieldDeclaration => fieldDeclaration.AttributeLists.Count > 0)
+                        );
                 },
-                transform: static (generatorSyntaxContext, _) =>
-                {
-                    var diagnosticsBuilder = ImmutableArray.CreateBuilder<Diagnostic>();
+                transform: static (generatorSyntaxContext, cancellationToken) => GetTypeContext(
+                    generatorSyntaxContext,
+                    cancellationToken
+                )
+            )
+            .Where(static result => result is not null)
+            .Select(static (result, _) => result!);
+        var diagnosticProvider = analysisResult
+            .Where(static result => result is AnalysisResult<TypeContext>.Failure)
+            .SelectMany(static (result, _) => ((AnalysisResult<TypeContext>.Failure)result).Diagnostics);
+        var typeContextProvider = analysisResult
+            .Where(static result => result is AnalysisResult<TypeContext>.Success)
+            .Select(static (result, _) => ((AnalysisResult<TypeContext>.Success)result).Model);
 
-                    var semanticModel = generatorSyntaxContext.SemanticModel;
-
-                    if (semanticModel.GetDeclaredSymbol(generatorSyntaxContext.Node) is not INamedTypeSymbol typeSymbol)
-                    {
-                        return ((TypeContext?)null, diagnosticsBuilder.ToImmutable());
-                    }
-
-                    var defaultsAttribute = typeSymbol
-                        .GetAttributes()
-                        .FirstOrDefault(attributeData =>
-                        {
-                            return attributeData.AttributeClass?.ToDisplayString() == PropertyGenerationDefaultsAttributeString;
-                        });
-
-                    var hasAccessorField = typeSymbol
-                        .GetMembers()
-                        .OfType<IFieldSymbol>()
-                        .Any(fieldSymbol => fieldSymbol.GetAttributes().Any(attributeData =>
-                        {
-                            var attributeName = attributeData.AttributeClass?.ToDisplayString();
-
-                            return attributeName is GetAttributeString or GetSetAttributeString;
-                        }));
-
-                    if (!hasAccessorField)
-                    {
-                        return ((TypeContext?)null, diagnosticsBuilder.ToImmutable());
-                    }
-
-                    var prefixPatternArgument = defaultsAttribute?.ConstructorArguments[1].Value;
-                    var typeLevelPrefixRegex = GetPrefixRegex(prefixPatternArgument);
-
-                    if (typeLevelPrefixRegex == null)
-                    {
-                        diagnosticsBuilder.Add(Diagnostic.Create(
-                            descriptor: InvalidPrefixPatternRule,
-                            location: defaultsAttribute?.ApplicationSyntaxReference?.GetSyntax().GetLocation(),
-                            messageArgs: [prefixPatternArgument]
-                        ));
-
-                        return ((TypeContext?)null, diagnosticsBuilder.ToImmutable());
-                    }
-
-                    return (
-                        new TypeContext(
-                            Symbol: typeSymbol,
-                            AccessModifier: GetAccessModifier(defaultsAttribute?.ConstructorArguments[0].Value),
-                            PrefixRegex: typeLevelPrefixRegex,
-                            NamingRule: GetNamingRule(defaultsAttribute?.ConstructorArguments[2].Value),
-                            Compilation: (CSharpCompilation)semanticModel.Compilation
-                        ),
-                        diagnosticsBuilder.ToImmutable()
-                    );
-                }
-            );
-
-        context.RegisterSourceOutput(valuesProvider.Collect(), (sourceProductionContext, typeContexts) =>
+        context.RegisterSourceOutput(diagnosticProvider, static (sourceProductionContext, diagnostic) =>
+        {
+            sourceProductionContext.ReportDiagnostic(diagnostic);
+        });
+        context.RegisterSourceOutput(typeContextProvider.Collect(), (sourceProductionContext, typeContexts) =>
         {
             var visitedTypes = new HashSet<INamedTypeSymbol>(SymbolEqualityComparer.Default);
 
-            foreach (var (typeContext, typeDiagnostics) in typeContexts)
+            foreach (var typeContext in typeContexts)
             {
-                foreach (var diagnostic in typeDiagnostics)
-                {
-                    sourceProductionContext.ReportDiagnostic(diagnostic);
-                }
-
-                if (typeContext == null)
-                {
-                    continue;
-                }
-
                 if (!visitedTypes.Add(typeContext.Symbol))
                 {
                     continue;
@@ -510,18 +439,24 @@ public sealed class PropertyAccessorGenerator : IIncrementalGenerator
 
                 var builder = ImmutableArray.CreateBuilder<string>();
 
-                foreach (var (propertyContext, fieldDiagnostics) in GetPropertyContexts(typeContext))
+                foreach (var propertyAnalysisResult in GetPropertyContexts(typeContext))
                 {
-                    foreach (var diagnostic in fieldDiagnostics)
+                    if (propertyAnalysisResult is AnalysisResult<PropertyContext>.Failure failure)
                     {
-                        sourceProductionContext.ReportDiagnostic(diagnostic);
+                        foreach (var diagnostic in failure.Diagnostics)
+                        {
+                            sourceProductionContext.ReportDiagnostic(diagnostic);
+                        }
+
+                        continue;
                     }
 
-                    if (propertyContext == null)
+                    if (propertyAnalysisResult is not AnalysisResult<PropertyContext>.Success success)
                     {
                         continue;
                     }
 
+                    var propertyContext = success.Model;
                     var lines = GenerateAccessorCode(propertyContext);
                     if (lines.IsEmpty)
                     {
