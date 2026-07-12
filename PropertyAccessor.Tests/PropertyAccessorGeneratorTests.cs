@@ -1,76 +1,12 @@
-using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.CSharp;
+
+using static Macaron.PropertyAccessor.Tests.Helper;
 
 namespace Macaron.PropertyAccessor.Tests;
 
 [TestFixture]
 public class PropertyAccessorGeneratorTests
 {
-    private static void AssertGeneratedCode(
-        string sourceCode,
-        string expected,
-        out ImmutableArray<Diagnostic> diagnostics
-    )
-    {
-        (diagnostics, var generatedCode) = CompileAndGetResults(sourceCode);
-
-        Assert.That(generatedCode.ReplaceLineEndings(), Is.EqualTo(expected.ReplaceLineEndings()));
-    }
-
-    private static void AssertGeneratedCode(
-        string sourceCode,
-        string expected
-    )
-    {
-        var (_, generatedCode) = CompileAndGetResults(sourceCode);
-
-        Assert.That(generatedCode.ReplaceLineEndings(), Is.EqualTo(expected.ReplaceLineEndings()));
-    }
-
-    private static (ImmutableArray<Diagnostic> diagnostics, string generatedCode) CompileAndGetResults(string sourceCode)
-    {
-        var attributeAssembly = typeof(GetSetAttribute).Assembly;
-        var references = AppDomain
-            .CurrentDomain
-            .GetAssemblies()
-            .Where(assembly => !assembly.IsDynamic && !string.IsNullOrWhiteSpace(assembly.Location))
-            .Append(attributeAssembly)
-            .Select(assembly => MetadataReference.CreateFromFile(assembly.Location))
-            .Cast<MetadataReference>()
-            .ToImmutableArray();
-
-        var syntaxTree = CSharpSyntaxTree.ParseText(sourceCode);
-        var compilation = CSharpCompilation.Create(
-            assemblyName: "Macaron.PropertyAccessor.Tests",
-            syntaxTrees: [syntaxTree],
-            references: references,
-            options: new CSharpCompilationOptions(
-                outputKind: OutputKind.DynamicallyLinkedLibrary,
-                nullableContextOptions: NullableContextOptions.Enable
-            )
-        );
-
-        var generator = new PropertyAccessorGenerator();
-        GeneratorDriver driver = CSharpGeneratorDriver.Create(generator);
-
-        driver = driver.RunGeneratorsAndUpdateCompilation(
-            compilation,
-            out var outputCompilation,
-            out var generatorDiagnostics
-        );
-
-        var result = driver.GetRunResult().Results.Single();
-        var generatedSources = result.GeneratedSources;
-        var generatedCode = generatedSources.Length > 0 ? generatedSources[0].SourceText.ToString() : "";
-
-        var allDiagnostics = outputCompilation.GetDiagnostics()
-            .Concat(generatorDiagnostics)
-            .ToImmutableArray();
-
-        return (allDiagnostics, generatedCode);
-    }
-
     [Test]
     public void Should_GenerateGet_When_TypeHasNoPropertyGenerationDefaults()
     {
