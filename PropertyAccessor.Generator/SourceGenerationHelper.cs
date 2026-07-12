@@ -1,20 +1,72 @@
 ﻿using System.Collections.Immutable;
 using System.Text;
 using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.Text;
 
 using static Microsoft.CodeAnalysis.CSharp.SyntaxFacts;
-using static Microsoft.CodeAnalysis.CSharp.SyntaxKind;
+using static Microsoft.CodeAnalysis.SymbolDisplayFormat;
+using static Microsoft.CodeAnalysis.SymbolDisplayMiscellaneousOptions;
 
 namespace Macaron.PropertyAccessor;
 
 public static class SourceGenerationHelpers
 {
     #region Constants
-    public const string Indent = "    ";
+    private const string Indent = "    ";
     #endregion
 
     #region Methods
+    public static ImmutableArray<string> GenerateAccessorCode(PropertyContext propertyContext)
+    {
+        var (
+            accessModifier,
+            typeSymbol,
+            propertyName,
+            fieldName,
+            accessorKind,
+            isInitAccessor,
+            getterRequiresExplicitConversion
+        ) = propertyContext;
+
+        if (accessorKind == PropertyAccessorKind.None)
+        {
+            return ImmutableArray<string>.Empty;
+        }
+
+        var escapedFieldName = GetEscapedIdentifier(fieldName);
+        var escapedPropertyName = GetEscapedIdentifier(propertyName);
+        var propertyTypeName = typeSymbol.ToDisplayString(FullyQualifiedFormat.WithMiscellaneousOptions(
+            IncludeNullableReferenceTypeModifier | UseSpecialTypes
+        ));
+
+        var builder = ImmutableArray.CreateBuilder<string>();
+
+        builder.Add($"{GetAccessorModifier(accessModifier)} {propertyTypeName} {escapedPropertyName}");
+        builder.Add("{");
+
+        if (accessorKind is PropertyAccessorKind.Get or PropertyAccessorKind.GetSet)
+        {
+            var getterExpression = escapedFieldName;
+
+            if (getterRequiresExplicitConversion)
+            {
+                getterExpression = $"({propertyTypeName}){getterExpression}";
+            }
+
+            builder.Add($"{Indent}get => {getterExpression};");
+        }
+
+        if (accessorKind == PropertyAccessorKind.GetSet)
+        {
+            builder.Add($"{Indent}{(isInitAccessor ? "init" : "set")} => {escapedFieldName} = value;");
+        }
+
+        builder.Add("}");
+
+        return builder.ToImmutable();
+    }
+
     public static void AddSource(
         SourceProductionContext context,
         INamedTypeSymbol typeSymbol,
@@ -105,6 +157,21 @@ public static class SourceGenerationHelpers
         return stringBuilder;
     }
 
+    private static string GetAccessorModifier(PropertyAccessModifier accessModifier)
+    {
+        return accessModifier switch
+        {
+            PropertyAccessModifier.Public => "public",
+            PropertyAccessModifier.Protected => "protected",
+            PropertyAccessModifier.Internal => "internal",
+            PropertyAccessModifier.Private => "private",
+            PropertyAccessModifier.ProtectedInternal => "protected internal",
+            PropertyAccessModifier.PrivateProtected => "private protected",
+            PropertyAccessModifier.File => "file",
+            _ => throw new InvalidOperationException($"Invalid access modifier: {accessModifier}"),
+        };
+    }
+
     private static string GetPartialTypeDeclarationString(INamedTypeSymbol typeSymbol)
     {
         var typeModifier = typeSymbol.IsReadOnly ? "readonly " : "";
@@ -166,7 +233,8 @@ public static class SourceGenerationHelpers
 
     private static string GetEscapedIdentifier(string identifier)
     {
-        return GetKeywordKind(identifier) != None || GetContextualKeywordKind(identifier) != None
+        return GetKeywordKind(identifier) != SyntaxKind.None
+            || GetContextualKeywordKind(identifier) != SyntaxKind.None
             ? "@" + identifier
             : identifier;
     }
