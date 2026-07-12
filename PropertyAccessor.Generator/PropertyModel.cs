@@ -1,10 +1,8 @@
-using Microsoft.CodeAnalysis;
-
 namespace Macaron.PropertyAccessor;
 
-public sealed record PropertyContext(
+internal sealed record PropertyModel(
     PropertyAccessModifier AccessModifier,
-    ITypeSymbol TypeSymbol,
+    string TypeName,
     string Name,
     string FieldName,
     PropertyAccessorKind AccessorKind,

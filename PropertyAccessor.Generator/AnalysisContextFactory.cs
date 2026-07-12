@@ -5,6 +5,7 @@ using Microsoft.CodeAnalysis.CSharp;
 
 using static Macaron.PropertyAccessor.AttributeMetadataNames;
 using static Microsoft.CodeAnalysis.SymbolDisplayFormat;
+using static Microsoft.CodeAnalysis.SymbolDisplayMiscellaneousOptions;
 
 namespace Macaron.PropertyAccessor;
 
@@ -117,26 +118,39 @@ internal static class AnalysisContextFactory
         #endregion
     }
 
-    public static ImmutableArray<AnalysisResult<PropertyContext>> GetPropertyContexts(
-        TypeContext typeContext
+    public static ImmutableArray<AnalysisResult<PropertyModel>> GetPropertyModels(
+        TypeContext typeContext,
+        CancellationToken cancellationToken
     )
     {
         var (typeSymbol, accessModifier, prefixRegex, namingRule, compilation) = typeContext;
+        var builder = ImmutableArray.CreateBuilder<AnalysisResult<PropertyModel>>();
 
-        return typeSymbol
-            .GetMembers()
-            .OfType<IFieldSymbol>()
-            .Where(HasAccessorAttribute)
-            .Select(symbol => GetPropertyContext(
-                symbol,
+        foreach (var fieldSymbol in typeSymbol.GetMembers().OfType<IFieldSymbol>())
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            if (!HasAccessorAttribute(fieldSymbol))
+            {
+                continue;
+            }
+
+            var result = GetPropertyModel(
+                fieldSymbol,
                 accessModifier,
                 prefixRegex,
                 namingRule,
-                compilation
-            ))
-            .Where(static result => result != null)
-            .Select(static result => result!)
-            .ToImmutableArray();
+                compilation,
+                cancellationToken
+            );
+
+            if (result != null)
+            {
+                builder.Add(result);
+            }
+        }
+
+        return builder.ToImmutable();
 
         #region Local Functions
         static bool HasAccessorAttribute(IFieldSymbol fieldSymbol)
@@ -182,12 +196,13 @@ internal static class AnalysisContextFactory
         ));
     }
 
-    private static AnalysisResult<PropertyContext>? GetPropertyContext(
+    private static AnalysisResult<PropertyModel>? GetPropertyModel(
         IFieldSymbol fieldSymbol,
         PropertyAccessModifier accessModifier,
         Regex prefixRegex,
         PropertyNamingRule namingRule,
-        CSharpCompilation compilation
+        CSharpCompilation compilation,
+        CancellationToken cancellationToken
     )
     {
         var fieldName = fieldSymbol.Name;
@@ -224,7 +239,7 @@ internal static class AnalysisContextFactory
 
         if (fieldSymbol.IsStatic && accessorKind != PropertyAccessorKind.None)
         {
-            return new AnalysisResult<PropertyContext>.Failure(Diagnostic.Create(
+            return new AnalysisResult<PropertyModel>.Failure(Diagnostic.Create(
                 descriptor: Diagnostics.StaticFieldNotSupportedRule,
                 location: fieldSymbol.Locations.FirstOrDefault(),
                 messageArgs: [fieldName]
@@ -244,12 +259,15 @@ internal static class AnalysisContextFactory
             && getAttribute.ConstructorArguments[0].Value is ITypeSymbol propertyTypeSymbol
         )
         {
-            var diagnosticLocation = getAttribute.ApplicationSyntaxReference?.GetSyntax().GetLocation();
+            var diagnosticLocation = getAttribute
+                .ApplicationSyntaxReference?
+                .GetSyntax(cancellationToken)
+                .GetLocation();
             var getterConversion = compilation.ClassifyConversion(fieldTypeSymbol, propertyTypeSymbol);
 
             if (!getterConversion.Exists)
             {
-                return new AnalysisResult<PropertyContext>.Failure(Diagnostic.Create(
+                return new AnalysisResult<PropertyModel>.Failure(Diagnostic.Create(
                     descriptor: Diagnostics.InvalidGetterConversionRule,
                     location: diagnosticLocation,
                     messageArgs:
@@ -273,7 +291,7 @@ internal static class AnalysisContextFactory
 
         if (propertyName.Length < 1)
         {
-            return new AnalysisResult<PropertyContext>.Failure(Diagnostic.Create(
+            return new AnalysisResult<PropertyModel>.Failure(Diagnostic.Create(
                 descriptor: Diagnostics.InvalidPropertyNameAfterPrefixRemovalRule,
                 location: fieldSymbol.Locations.FirstOrDefault(),
                 messageArgs: [fieldName, prefixRegex]
@@ -282,19 +300,24 @@ internal static class AnalysisContextFactory
 
         if (propertyName == fieldName)
         {
-            return new AnalysisResult<PropertyContext>.Failure(Diagnostic.Create(
+            return new AnalysisResult<PropertyModel>.Failure(Diagnostic.Create(
                 descriptor: Diagnostics.PropertyNameSameAsFieldNameRule,
                 location: fieldSymbol.Locations.FirstOrDefault(),
                 messageArgs: [fieldName, prefixRegex, propertyName]
             ));
         }
 
-        return new AnalysisResult<PropertyContext>.Success(new PropertyContext(
+        var propertyTypeName = typeSymbol.ToDisplayString(FullyQualifiedFormat.WithMiscellaneousOptions(
+            IncludeNullableReferenceTypeModifier
+            | UseSpecialTypes
+        ));
+
+        return new AnalysisResult<PropertyModel>.Success(new PropertyModel(
             AccessModifier: GetAccessModifier(
                 GetConstructorArgumentValue(shapeAttribute, usesGetAttribute ? 1 : 0),
                 accessModifier
             ),
-            TypeSymbol: typeSymbol,
+            TypeName: propertyTypeName,
             Name: propertyName,
             FieldName: fieldName,
             AccessorKind: accessorKind,

@@ -1,7 +1,8 @@
-using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
+using Microsoft.CodeAnalysis.Text;
 
+using static System.Text.Encoding;
 using static Macaron.PropertyAccessor.AttributeMetadataNames;
 
 namespace Macaron.PropertyAccessor;
@@ -58,67 +59,38 @@ public sealed class PropertyAccessorGenerator : IIncrementalGenerator
             .Select(static (attributeContexts, cancellationToken) =>
             {
                 var ((getAttributeContexts, getSetAttributeContexts), defaultsAttributeContexts) = attributeContexts;
-
-                return AnalysisContextFactory.GetTypeContexts(
+                var typeAnalysisResults = AnalysisContextFactory.GetTypeContexts(
                     getAttributeContexts,
                     getSetAttributeContexts,
                     defaultsAttributeContexts,
                     cancellationToken
                 );
+
+                return GenerationModelFactory.GetGenerationModels(
+                    typeAnalysisResults,
+                    cancellationToken
+                );
             })
             .SelectMany(static (analysisResults, _) => analysisResults);
         var diagnosticProvider = analysisResultProvider
-            .Where(static result => result is AnalysisResult<TypeContext>.Failure)
-            .SelectMany(static (result, _) => ((AnalysisResult<TypeContext>.Failure)result).Diagnostics);
-        var typeContextProvider = analysisResultProvider
-            .Where(static result => result is AnalysisResult<TypeContext>.Success)
-            .Select(static (result, _) => ((AnalysisResult<TypeContext>.Success)result).Model);
+            .Where(static result => result is AnalysisResult<GenerationModel>.Failure)
+            .SelectMany(static (result, _) => ((AnalysisResult<GenerationModel>.Failure)result).Diagnostics);
+        var generationModelProvider = analysisResultProvider
+            .Where(static result => result is AnalysisResult<GenerationModel>.Success)
+            .Select(static (result, _) => ((AnalysisResult<GenerationModel>.Success)result).Model)
+            .WithComparer(GenerationModelComparer.Instance);
 
         context.RegisterSourceOutput(diagnosticProvider, static (sourceProductionContext, diagnostic) =>
         {
             sourceProductionContext.ReportDiagnostic(diagnostic);
         });
-        context.RegisterSourceOutput(typeContextProvider, static (sourceProductionContext, typeContext) =>
+        context.RegisterSourceOutput(generationModelProvider, static (sourceProductionContext, generationModel) =>
         {
-            var builder = ImmutableArray.CreateBuilder<string>();
+            var sourceText = SourceGenerationHelpers.GetSource(generationModel);
 
-            foreach (var propertyAnalysisResult in AnalysisContextFactory.GetPropertyContexts(typeContext))
-            {
-                if (propertyAnalysisResult is AnalysisResult<PropertyContext>.Failure failure)
-                {
-                    foreach (var diagnostic in failure.Diagnostics)
-                    {
-                        sourceProductionContext.ReportDiagnostic(diagnostic);
-                    }
-
-                    continue;
-                }
-
-                if (propertyAnalysisResult is not AnalysisResult<PropertyContext>.Success success)
-                {
-                    continue;
-                }
-
-                var propertyContext = success.Model;
-                var lines = SourceGenerationHelpers.GenerateAccessorCode(propertyContext);
-
-                if (lines.IsEmpty)
-                {
-                    continue;
-                }
-
-                if (builder.Count > 0)
-                {
-                    builder.Add("");
-                }
-
-                builder.AddRange(lines);
-            }
-
-            SourceGenerationHelpers.AddSource(
-                context: sourceProductionContext,
-                typeSymbol: typeContext.Symbol,
-                lines: builder.ToImmutable()
+            sourceProductionContext.AddSource(
+                hintName: generationModel.HintName,
+                sourceText: SourceText.From(sourceText, encoding: UTF8)
             );
         });
     }
