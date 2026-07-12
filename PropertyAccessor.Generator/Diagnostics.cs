@@ -48,4 +48,13 @@ public sealed class Diagnostics
         DiagnosticSeverity.Error,
         isEnabledByDefault: true
     );
+
+    public static readonly DiagnosticDescriptor ConflictingAccessorAttributesRule = new(
+        id: "MPROP0006",
+        title: "Get and GetSet cannot be used together",
+        messageFormat: "Field '{0}' cannot declare both [Get] and [GetSet]",
+        category: "Usage",
+        DiagnosticSeverity.Error,
+        isEnabledByDefault: true
+    );
 }

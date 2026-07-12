@@ -237,6 +237,15 @@ internal static class AnalysisContextFactory
             }
         }
 
+        if (getAttribute != null && getSetAttribute != null)
+        {
+            return new AnalysisResult<PropertyModel>.Failure(Diagnostic.Create(
+                descriptor: Diagnostics.ConflictingAccessorAttributesRule,
+                location: fieldSymbol.Locations.FirstOrDefault(),
+                messageArgs: [fieldName]
+            ));
+        }
+
         if (fieldSymbol.IsStatic && accessorKind != PropertyAccessorKind.None)
         {
             return new AnalysisResult<PropertyModel>.Failure(Diagnostic.Create(
