@@ -1,0 +1,6 @@
+<Solution>
+  <Project Path="PropertyAccessor/PropertyAccessor.csproj" />
+  <Project Path="PropertyAccessor.Core/PropertyAccessor.Core.csproj" />
+  <Project Path="PropertyAccessor.Generator/PropertyAccessor.Generator.csproj" />
+  <Project Path="PropertyAccessor.Tests/PropertyAccessor.Tests.csproj" />
+</Solution>

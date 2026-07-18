@@ -78,7 +78,6 @@ public sealed class PropertyAccessorGenerator : IIncrementalGenerator
         var generationModelProvider = analysisResultProvider
             .Where(static result => result is AnalysisResult<GenerationModel>.Success)
             .Select(static (result, _) => ((AnalysisResult<GenerationModel>.Success)result).Model)
-            .WithComparer(GenerationModelComparer.Instance)
             .WithTrackingName("GenerationModel");
 
         context.RegisterSourceOutput(diagnosticProvider, static (sourceProductionContext, diagnostic) =>

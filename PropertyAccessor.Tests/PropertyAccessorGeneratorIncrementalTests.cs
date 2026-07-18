@@ -103,7 +103,7 @@ public class PropertyAccessorGeneratorIncrementalTests
 
         Assert.That(reasons, Has.Count.EqualTo(2));
         Assert.That(reasons.Count(reason => reason == IncrementalStepRunReason.Modified), Is.EqualTo(1));
-        Assert.That(reasons.Count(reason => reason == IncrementalStepRunReason.Unchanged), Is.EqualTo(1));
+        Assert.That(reasons.Count(reason => reason == IncrementalStepRunReason.Cached), Is.EqualTo(1));
     }
     #endregion
 }
