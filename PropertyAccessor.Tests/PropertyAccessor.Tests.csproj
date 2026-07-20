@@ -19,7 +19,7 @@
   </ItemGroup>
   
   <ItemGroup>
-    <ProjectReference Include="..\PropertyAccessor.Core\PropertyAccessor.Core.csproj" />
+    <ProjectReference Include="..\PropertyAccessor.Attribute\PropertyAccessor.Attribute.csproj" />
     <ProjectReference Include="..\PropertyAccessor.Generator\PropertyAccessor.Generator.csproj" />
   </ItemGroup>
 

@@ -15,13 +15,13 @@
   </PropertyGroup>
   
   <ItemGroup>
-    <ProjectReference Include="..\PropertyAccessor.Core\PropertyAccessor.Core.csproj" PrivateAssets="all" />
+    <ProjectReference Include="..\PropertyAccessor.Attribute\PropertyAccessor.Attribute.csproj" PrivateAssets="all" />
     <ProjectReference Include="..\PropertyAccessor.Generator\PropertyAccessor.Generator.csproj" PrivateAssets="all" />
   </ItemGroup>
 
   <ItemGroup>
-    <None Include="..\PropertyAccessor.Core\bin\$(Configuration)\netstandard2.0\Macaron.PropertyAccessor.Core.dll" Pack="true" PackagePath="lib/netstandard2.0" />
-    <None Include="..\PropertyAccessor.Core\bin\$(Configuration)\netstandard2.0\Macaron.PropertyAccessor.Core.dll" Pack="true" PackagePath="analyzers/dotnet/cs/" />
+    <None Include="..\PropertyAccessor.Attribute\bin\$(Configuration)\netstandard2.0\Macaron.PropertyAccessor.Attribute.dll" Pack="true" PackagePath="lib/netstandard2.0" />
+    <None Include="..\PropertyAccessor.Attribute\bin\$(Configuration)\netstandard2.0\Macaron.PropertyAccessor.Attribute.dll" Pack="true" PackagePath="analyzers/dotnet/cs/" />
     <None Include="..\PropertyAccessor.Generator\bin\$(Configuration)\netstandard2.0\Macaron.PropertyAccessor.Generator.dll" Pack="true" PackagePath="analyzers/dotnet/cs/" />
   </ItemGroup>
 
