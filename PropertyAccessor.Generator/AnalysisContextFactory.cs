@@ -172,7 +172,10 @@ internal static class AnalysisContextFactory
         CancellationToken cancellationToken
     )
     {
-        var prefixPatternArgument = defaultsAttribute?.ConstructorArguments[1].Value;
+        var prefixPatternArgument = GetNamedArgumentValue(
+            defaultsAttribute,
+            nameof(PropertyGenerationDefaultsAttribute.PrefixPattern)
+        );
         var typeLevelPrefixRegex = GetPrefixRegex(prefixPatternArgument);
 
         if (typeLevelPrefixRegex == null)
@@ -189,9 +192,15 @@ internal static class AnalysisContextFactory
 
         return new AnalysisResult<TypeContext>.Success(new TypeContext(
             Symbol: typeSymbol,
-            AccessModifier: GetAccessModifier(defaultsAttribute?.ConstructorArguments[0].Value),
+            AccessModifier: GetAccessModifier(GetNamedArgumentValue(
+                defaultsAttribute,
+                nameof(PropertyGenerationDefaultsAttribute.AccessModifier)
+            )),
             PrefixRegex: typeLevelPrefixRegex,
-            NamingRule: GetNamingRule(defaultsAttribute?.ConstructorArguments[2].Value),
+            NamingRule: GetNamingRule(GetNamedArgumentValue(
+                defaultsAttribute,
+                nameof(PropertyGenerationDefaultsAttribute.NamingRule)
+            )),
             Compilation: compilation
         ));
     }
@@ -264,8 +273,8 @@ internal static class AnalysisContextFactory
 
         var shapeAttribute = getSetAttribute ?? getAttribute;
         if (accessorKind == PropertyAccessorKind.Get
-            && getAttribute is { ConstructorArguments.Length: > 0 }
-            && getAttribute.ConstructorArguments[0].Value is ITypeSymbol propertyTypeSymbol
+            && getAttribute != null
+            && GetNamedArgumentValue(getAttribute, nameof(GetAttribute.Type)) is ITypeSymbol propertyTypeSymbol
         )
         {
             var diagnosticLocation = getAttribute
@@ -292,8 +301,7 @@ internal static class AnalysisContextFactory
             getterRequiresExplicitConversion = !getterConversion.IsImplicit;
         }
 
-        var usesGetAttribute = ReferenceEquals(shapeAttribute, getAttribute);
-        var explicitPropertyName = GetConstructorArgumentValue(shapeAttribute, usesGetAttribute ? 2 : 1) as string;
+        var explicitPropertyName = GetConstructorArgumentValue(shapeAttribute, 0) as string;
         var propertyName = !string.IsNullOrWhiteSpace(explicitPropertyName)
             ? explicitPropertyName!
             : GetPropertyName(fieldName, prefixRegex, namingRule);
@@ -323,7 +331,7 @@ internal static class AnalysisContextFactory
 
         return new AnalysisResult<PropertyModel>.Success(new PropertyModel(
             AccessModifier: GetAccessModifier(
-                GetConstructorArgumentValue(shapeAttribute, usesGetAttribute ? 1 : 0),
+                GetNamedArgumentValue(shapeAttribute, nameof(GetAttribute.AccessModifier)),
                 accessModifier
             ),
             TypeName: propertyTypeName,
@@ -363,6 +371,24 @@ internal static class AnalysisContextFactory
         return constructorArguments is { Length: > 0 and var length } && index < length
             ? constructorArguments.Value[index].Value
             : null;
+    }
+
+    private static object? GetNamedArgumentValue(AttributeData? attributeData, string name)
+    {
+        if (attributeData == null)
+        {
+            return null;
+        }
+
+        foreach (var namedArgument in attributeData.NamedArguments)
+        {
+            if (namedArgument.Key == name)
+            {
+                return namedArgument.Value.Value;
+            }
+        }
+
+        return null;
     }
 
     private static PropertyAccessModifier GetAccessModifier(

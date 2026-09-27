@@ -17,7 +17,7 @@ public class PropertyAccessorGeneratorDiagnosticTests
 
             public partial class Foo
             {
-                [Get(typeof(int))]
+                [Get(Type = typeof(int))]
                 private string _answer = "";
             }
             """,
@@ -124,7 +124,7 @@ public class PropertyAccessorGeneratorDiagnosticTests
             """
             namespace Macaron.PropertyAccessor.Tests;
 
-            [PropertyGenerationDefaults(prefixPattern: "[invalid")]
+            [PropertyGenerationDefaults(PrefixPattern = "[invalid")]
             public partial class Foo
             {
                 [Get]
@@ -151,7 +151,7 @@ public class PropertyAccessorGeneratorDiagnosticTests
 
             public partial class Foo
             {
-                [PropertyGenerationDefaults(prefixPattern: "_"), Get]
+                [PropertyGenerationDefaults(PrefixPattern = "_"), Get]
                 private int _answer = 42;
             }
             """,
@@ -186,7 +186,7 @@ public class PropertyAccessorGeneratorDiagnosticTests
             """
             namespace Macaron.PropertyAccessor.Tests;
 
-            [PropertyGenerationDefaults(prefixPattern: @"^(m_|_|s_)")]
+            [PropertyGenerationDefaults(PrefixPattern = @"^(m_|_|s_)")]
             public partial class Foo
             {
                 [Get]

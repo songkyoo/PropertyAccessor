@@ -69,14 +69,14 @@ partial class Foo
 
 #### Get 프로퍼티 타입 지정하기
 
-`Get`의 첫 번째 인자인 `propertyType`에 생성할 프로퍼티의 타입을 직접 지정할 수 있습니다.
+`Get`의 `Type` 프로퍼티에 생성할 프로퍼티의 타입을 직접 지정할 수 있습니다.
 
 ```csharp
 using Macaron.PropertyAccessor;
 
 public partial class Foo
 {
-    [Get(typeof(int))]
+    [Get(Type = typeof(int))]
     private long _answer;
 }
 ```
@@ -107,17 +107,17 @@ partial class Foo
 
 `PropertyGenerationDefaults`는 해당 타입에서 생성되는 프로퍼티에 적용할 기본 옵션을 지정합니다.
 
-- `accessModifier` PropertyAccessModifier: 프로퍼티를 생성할 때 사용할 접근 한정자를 지정합니다. 기본값은 `Public`입니다.
-- `prefixPattern` string: 필드 이름에서 제거할 접두어를 나타내는 정규식 문자열입니다. 기본값은 `^(_|m_)`입니다.
-- `namingRule` PropertyNamingRule: 접두어를 제거한 필드 이름을 어떻게 변경할지 결정합니다. 기본값은 `PascalCase`입니다.
+- `AccessModifier` PropertyAccessModifier: 프로퍼티를 생성할 때 사용할 접근 한정자를 지정합니다. 기본값은 `Public`입니다.
+- `PrefixPattern` string: 필드 이름에서 제거할 접두어를 나타내는 정규식 문자열입니다. 기본값은 `^(_|m_)`입니다.
+- `NamingRule` PropertyNamingRule: 접두어를 제거한 필드 이름을 어떻게 변경할지 결정합니다. 기본값은 `PascalCase`입니다.
 
 ```csharp
 using Macaron.PropertyAccessor;
 
 [PropertyGenerationDefaults(
-    accessModifier: PropertyAccessModifier.Public,
-    prefixPattern: "f",
-    namingRule: PropertyNamingRule.CamelCase
+    AccessModifier = PropertyAccessModifier.Public,
+    PrefixPattern = "f",
+    NamingRule = PropertyNamingRule.CamelCase
 )]
 public partial class Foo
 {
@@ -147,9 +147,9 @@ partial class Foo
 using Macaron.PropertyAccessor;
 
 [PropertyGenerationDefaults(
-    accessModifier: PropertyAccessModifier.Public,
-    prefixPattern: "f",
-    namingRule: PropertyNamingRule.CamelCase
+    AccessModifier = PropertyAccessModifier.Public,
+    PrefixPattern = "f",
+    NamingRule = PropertyNamingRule.CamelCase
 )]
 public partial class Foo
 {
@@ -168,18 +168,18 @@ public partial class Foo
 
 #### 필드별 이름과 접근 한정자 지정하기
 
-필드별 프로퍼티 이름과 접근 한정자는 `Get` 또는 `GetSet` 어트리뷰트에서 지정할 수 있습니다. 지정하지 않은 값은 타입에 적용된 `PropertyGenerationDefaults` 옵션을 따릅니다.
+필드별 프로퍼티 이름은 `Get` 또는 `GetSet`의 `name` 생성자 인수로, 접근 한정자는 `AccessModifier` 프로퍼티로 지정할 수 있습니다. 지정하지 않은 값은 타입에 적용된 `PropertyGenerationDefaults` 옵션을 따릅니다.
 
 ```csharp
 using Macaron.PropertyAccessor;
 
-[PropertyGenerationDefaults(accessModifier: PropertyAccessModifier.Protected)]
+[PropertyGenerationDefaults(AccessModifier = PropertyAccessModifier.Protected)]
 public partial class Foo
 {
     [Get(name: "name")]
     private string fName;
 
-    [GetSet(accessModifier: PropertyAccessModifier.Private, name: "Age")]
+    [GetSet("Age", AccessModifier = PropertyAccessModifier.Private)]
     private int fAge;
 }
 ```

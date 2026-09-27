@@ -51,7 +51,7 @@ public class PropertyAccessorGeneratorTests
 
             public partial class Foo
             {
-                [GetSet(PropertyAccessModifier.Private, "Value")]
+                [GetSet("Value", AccessModifier = PropertyAccessModifier.Private)]
                 private int _answer = 42;
             }
             """,
@@ -272,7 +272,7 @@ public class PropertyAccessorGeneratorTests
 
             public partial class Foo
             {
-                [Get(typeof(int), PropertyAccessModifier.Private, "ConvertedAnswer")]
+                [Get("ConvertedAnswer", Type = typeof(int), AccessModifier = PropertyAccessModifier.Private)]
                 private long _answer = 42;
             }
             """,
@@ -319,7 +319,7 @@ public class PropertyAccessorGeneratorTests
 
             public partial class Foo
             {
-                [Get(typeof(Fahrenheit))]
+                [Get(Type = typeof(Fahrenheit))]
                 private Celsius _temperature;
             }
             """,
@@ -365,7 +365,7 @@ public class PropertyAccessorGeneratorTests
 
             public partial class Foo
             {
-                [Get(typeof(Container))]
+                [Get(Type = typeof(Container))]
                 private Value _value = new();
             }
             """,
@@ -453,9 +453,9 @@ public class PropertyAccessorGeneratorTests
             namespace Macaron.PropertyAccessor.Tests;
 
             [PropertyGenerationDefaults(
-                accessModifier: PropertyAccessModifier.Protected,
-                prefixPattern: "m",
-                namingRule: PropertyNamingRule.CamelCase
+                AccessModifier = PropertyAccessModifier.Protected,
+                PrefixPattern = "m",
+                NamingRule = PropertyNamingRule.CamelCase
             )]
             public partial class Foo
             {
@@ -492,16 +492,16 @@ public class PropertyAccessorGeneratorTests
             namespace Macaron.PropertyAccessor.Tests;
 
             [PropertyGenerationDefaults(
-                accessModifier: PropertyAccessModifier.Protected,
-                prefixPattern: "m",
-                namingRule: PropertyNamingRule.CamelCase
+                AccessModifier = PropertyAccessModifier.Protected,
+                PrefixPattern = "m",
+                NamingRule = PropertyNamingRule.CamelCase
             )]
             public partial class Foo
             {
                 [Get(name: "bar")]
                 public string _bar = "bar";
 
-                [GetSet(accessModifier: PropertyAccessModifier.Private, name: "Answer")]
+                [GetSet("Answer", AccessModifier = PropertyAccessModifier.Private)]
                 public int m_answer = 42;
 
                 [Get]
@@ -566,7 +566,7 @@ public class PropertyAccessorGeneratorTests
             """
             namespace Macaron.PropertyAccessor.Tests;
 
-            [PropertyGenerationDefaults(prefixPattern: "")]
+            [PropertyGenerationDefaults(PrefixPattern = "")]
             public partial class Foo
             {
                 [Get]
@@ -605,7 +605,7 @@ public class PropertyAccessorGeneratorTests
             """
             namespace Macaron.PropertyAccessor.Tests;
 
-            [PropertyGenerationDefaults(accessModifier: PropertyAccessModifier.Protected)]
+            [PropertyGenerationDefaults(AccessModifier = PropertyAccessModifier.Protected)]
             public partial class Outer
             {
                 public partial class Inner
@@ -646,7 +646,7 @@ public class PropertyAccessorGeneratorTests
             """
             namespace Macaron.PropertyAccessor.Tests;
 
-            [PropertyGenerationDefaults(accessModifier: PropertyAccessModifier.Protected)]
+            [PropertyGenerationDefaults(AccessModifier = PropertyAccessModifier.Protected)]
             public partial class Foo
             {
                 [Get]
@@ -748,7 +748,7 @@ public class PropertyAccessorGeneratorTests
             {
                 private int _outerField = 1;
 
-                [PropertyGenerationDefaults(accessModifier: PropertyAccessModifier.Internal)]
+                [PropertyGenerationDefaults(AccessModifier = PropertyAccessModifier.Internal)]
                 public partial class Inner
                 {
                     [Get]
@@ -1063,7 +1063,7 @@ public class PropertyAccessorGeneratorTests
 
             namespace Macaron.PropertyAccessor.Tests;
 
-            [Defaults(prefixPattern: "m_")]
+            [Defaults(PrefixPattern = "m_")]
             public partial class Foo
             {
                 [Getter]

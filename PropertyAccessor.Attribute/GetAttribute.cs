@@ -4,15 +4,11 @@ namespace Macaron.PropertyAccessor;
 
 [Conditional("SOURCE_GENERATOR_ONLY")]
 [AttributeUsage(AttributeTargets.Field)]
-public sealed class GetAttribute(
-    Type? propertyType = null,
-    PropertyAccessModifier accessModifier = PropertyAccessModifier.Default,
-    string name = ""
-) : Attribute
+public sealed class GetAttribute(string name = "") : Attribute
 {
-    public Type? PropertyType { get; } = propertyType;
+    public Type? Type { get; set; }
 
-    public PropertyAccessModifier AccessModifier { get; } = accessModifier;
+    public PropertyAccessModifier AccessModifier { get; set; } = PropertyAccessModifier.Default;
 
     public string Name { get; } = name;
 }

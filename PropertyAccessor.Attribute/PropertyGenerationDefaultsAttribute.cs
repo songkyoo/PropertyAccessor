@@ -4,15 +4,11 @@ namespace Macaron.PropertyAccessor;
 
 [Conditional("SOURCE_GENERATOR_ONLY")]
 [AttributeUsage(AttributeTargets.Class | AttributeTargets.Struct, Inherited = false)]
-public sealed class PropertyGenerationDefaultsAttribute(
-    PropertyAccessModifier accessModifier = PropertyAccessModifier.Default,
-    string prefixPattern = "",
-    PropertyNamingRule namingRule = PropertyNamingRule.Default
-) : Attribute
+public sealed class PropertyGenerationDefaultsAttribute : Attribute
 {
-    public PropertyAccessModifier AccessModifier { get; } = accessModifier;
+    public PropertyAccessModifier AccessModifier { get; set; } = PropertyAccessModifier.Default;
 
-    public string PrefixPattern { get; } = prefixPattern;
+    public string PrefixPattern { get; set; } = "";
 
-    public PropertyNamingRule NamingRule { get; } = namingRule;
+    public PropertyNamingRule NamingRule { get; set; } = PropertyNamingRule.Default;
 }
