@@ -125,6 +125,7 @@ internal static class AnalysisContextFactory
     {
         var (typeSymbol, accessModifier, prefixRegex, namingRule, compilation) = typeContext;
         var builder = ImmutableArray.CreateBuilder<AnalysisResult<PropertyModel>>();
+        var fields = new List<IFieldSymbol>();
 
         foreach (var fieldSymbol in typeSymbol.GetMembers().OfType<IFieldSymbol>())
         {
@@ -147,6 +148,30 @@ internal static class AnalysisContextFactory
             if (result != null)
             {
                 builder.Add(result);
+                fields.Add(fieldSymbol);
+            }
+        }
+
+        var candidates = builder.ToImmutable();
+
+        for (var i = 0; i < candidates.Length; ++i)
+        {
+            if (candidates[i] is not AnalysisResult<PropertyModel>.Success success
+                || success.Model.SetterMethodName is not { } setterMethodName
+            )
+            {
+                continue;
+            }
+
+            var field = fields[i];
+
+            if (HasSetterMethodConflict(typeSymbol, field, setterMethodName, candidates, fields, i))
+            {
+                builder[i] = new AnalysisResult<PropertyModel>.Failure(Diagnostic.Create(
+                    descriptor: Diagnostics.ConflictingSetterMethodRule,
+                    location: field.Locations.FirstOrDefault(),
+                    messageArgs: [setterMethodName, field.Name]
+                ));
             }
         }
 
@@ -324,23 +349,120 @@ internal static class AnalysisContextFactory
             ));
         }
 
+        string? setterMethodName = null;
+
+        if (getSetAttribute != null)
+        {
+            var setterNameValue = GetConstructorArgumentValue(getSetAttribute, index: 1);
+
+            if (setterNameValue is not "")
+            {
+                if (setterNameValue is not string setterName || !IsValidSetterMethodName(setterName))
+                {
+                    return new AnalysisResult<PropertyModel>.Failure(Diagnostic.Create(
+                        descriptor: Diagnostics.InvalidSetterMethodNameRule,
+                        location: fieldSymbol.Locations.FirstOrDefault(),
+                        messageArgs: [fieldName, setterNameValue]
+                    ));
+                }
+
+                if (fieldSymbol.IsReadOnly)
+                {
+                    return new AnalysisResult<PropertyModel>.Failure(Diagnostic.Create(
+                        descriptor: Diagnostics.ReadonlySetterMethodRule,
+                        location: fieldSymbol.Locations.FirstOrDefault(),
+                        messageArgs: [fieldName, setterName]
+                    ));
+                }
+
+                setterMethodName = setterName;
+            }
+        }
+
         var propertyTypeName = typeSymbol.ToDisplayString(FullyQualifiedFormat.WithMiscellaneousOptions(
             IncludeNullableReferenceTypeModifier
             | UseSpecialTypes
         ));
 
         return new AnalysisResult<PropertyModel>.Success(new PropertyModel(
+            FieldName: fieldName,
             AccessModifier: GetAccessModifier(
                 GetNamedArgumentValue(shapeAttribute, nameof(GetAttribute.AccessModifier)),
                 accessModifier
             ),
             TypeName: propertyTypeName,
             Name: propertyName,
-            FieldName: fieldName,
             AccessorKind: accessorKind,
+            GetterRequiresExplicitConversion: getterRequiresExplicitConversion,
             IsInitAccessor: fieldSymbol.IsReadOnly,
-            GetterRequiresExplicitConversion: getterRequiresExplicitConversion
+            SetterMethodName: setterMethodName
         ));
+    }
+
+    private static bool IsValidSetterMethodName(string name)
+    {
+        return SyntaxFacts.IsValidIdentifier(name) || SyntaxFacts.IsValidIdentifier("@" + name);
+    }
+
+    private static bool HasSetterMethodConflict(
+        INamedTypeSymbol typeSymbol,
+        IFieldSymbol field,
+        string setterMethodName,
+        ImmutableArray<AnalysisResult<PropertyModel>> candidates,
+        IReadOnlyList<IFieldSymbol> fields,
+        int index
+    )
+    {
+        var methodName = GetUnescapedIdentifier(setterMethodName);
+
+        if (methodName == typeSymbol.Name)
+        {
+            return true;
+        }
+
+        foreach (var member in typeSymbol.GetMembers(methodName))
+        {
+            if (member is not IMethodSymbol { MethodKind: MethodKind.Ordinary } method)
+            {
+                return true;
+            }
+
+            if (method is { Arity: 0, Parameters: [{ RefKind: RefKind.None }] }
+                && SymbolEqualityComparer.Default.Equals(method.Parameters[0].Type, field.Type)
+            )
+            {
+                return true;
+            }
+        }
+
+        for (var i = 0; i < candidates.Length; ++i)
+        {
+            if (candidates[i] is not AnalysisResult<PropertyModel>.Success candidate)
+            {
+                continue;
+            }
+
+            if (GetUnescapedIdentifier(candidate.Model.Name) == methodName)
+            {
+                return true;
+            }
+
+            if (i != index
+                && candidate.Model.SetterMethodName is { } candidateSetterName
+                && GetUnescapedIdentifier(candidateSetterName) == methodName
+                && SymbolEqualityComparer.Default.Equals(fields[i].Type, field.Type)
+            )
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static string GetUnescapedIdentifier(string name)
+    {
+        return name.StartsWith("@", StringComparison.Ordinal) ? name[1..] : name;
     }
 
     private static string GetPropertyName(

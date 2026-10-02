@@ -57,4 +57,31 @@ public sealed class Diagnostics
         DiagnosticSeverity.Error,
         isEnabledByDefault: true
     );
+
+    public static readonly DiagnosticDescriptor InvalidSetterMethodNameRule = new(
+        id: "MPROP0007",
+        title: "Invalid setter method name",
+        messageFormat: "Field '{0}' has an invalid setter method name '{1}'",
+        category: "Naming",
+        DiagnosticSeverity.Error,
+        isEnabledByDefault: true
+    );
+
+    public static readonly DiagnosticDescriptor ReadonlySetterMethodRule = new(
+        id: "MPROP0008",
+        title: "Cannot generate setter method for readonly field",
+        messageFormat: "Field '{0}' is readonly and cannot be assigned by setter method '{1}'",
+        category: "Usage",
+        DiagnosticSeverity.Error,
+        isEnabledByDefault: true
+    );
+
+    public static readonly DiagnosticDescriptor ConflictingSetterMethodRule = new(
+        id: "MPROP0009",
+        title: "Setter method conflicts with another member",
+        messageFormat: "Setter method '{0}' for field '{1}' conflicts with another member",
+        category: "Naming",
+        DiagnosticSeverity.Error,
+        isEnabledByDefault: true
+    );
 }

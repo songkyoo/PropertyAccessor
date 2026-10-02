@@ -1,11 +1,12 @@
 namespace Macaron.PropertyAccessor;
 
 internal sealed record PropertyModel(
+    string FieldName,
     PropertyAccessModifier AccessModifier,
     string TypeName,
     string Name,
-    string FieldName,
     PropertyAccessorKind AccessorKind,
+    bool GetterRequiresExplicitConversion,
     bool IsInitAccessor,
-    bool GetterRequiresExplicitConversion
+    string? SetterMethodName
 );

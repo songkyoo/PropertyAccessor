@@ -62,7 +62,7 @@ internal static class SourceGenerationHelpers
 
             foreach (var line in lines)
             {
-                stringBuilder.AppendLine($"{depthSpacerText}{line}");
+                stringBuilder.AppendLine(line.Length == 0 ? "" : $"{depthSpacerText}{line}");
             }
 
             hasProperty = true;
@@ -87,13 +87,14 @@ internal static class SourceGenerationHelpers
     private static ImmutableArray<string> GenerateAccessorCode(PropertyModel propertyModel)
     {
         var (
+            fieldName,
             accessModifier,
             propertyTypeName,
             propertyName,
-            fieldName,
             accessorKind,
+            getterRequiresExplicitConversion,
             isInitAccessor,
-            getterRequiresExplicitConversion
+            setterMethodName
         ) = propertyModel;
 
         if (accessorKind == PropertyAccessorKind.None)
@@ -120,12 +121,18 @@ internal static class SourceGenerationHelpers
             builder.Add($"{Indent}get => {getterExpression};");
         }
 
-        if (accessorKind == PropertyAccessorKind.GetSet)
+        if (accessorKind == PropertyAccessorKind.GetSet && setterMethodName == null)
         {
             builder.Add($"{Indent}{(isInitAccessor ? "init" : "set")} => {escapedFieldName} = value;");
         }
 
         builder.Add("}");
+
+        if (setterMethodName != null)
+        {
+            builder.Add("");
+            builder.Add($"{GetAccessorModifier(accessModifier)} void {GetEscapedIdentifier(setterMethodName)}({propertyTypeName} value) => this.{escapedFieldName} = value;");
+        }
 
         return builder.ToImmutable();
     }

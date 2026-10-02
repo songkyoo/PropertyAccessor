@@ -105,5 +105,58 @@ public class PropertyAccessorGeneratorIncrementalTests
         Assert.That(reasons.Count(reason => reason == IncrementalStepRunReason.Modified), Is.EqualTo(1));
         Assert.That(reasons.Count(reason => reason == IncrementalStepRunReason.Cached), Is.EqualTo(1));
     }
+
+    [Test]
+    public void Should_OnlyModifyChangedGenerationModel_When_SetterMethodNameChanges()
+    {
+        var compilation = CreateCompilation(
+            """
+            namespace Macaron.PropertyAccessor.Tests;
+
+            public partial class Foo
+            {
+                [GetSet(setterName: "SetOriginal")]
+                private int _value;
+            }
+
+            public partial class Bar
+            {
+                [Get]
+                private int _value;
+            }
+            """
+        );
+        var driver = CreateGeneratorDriver(trackIncrementalGeneratorSteps: true);
+
+        driver = driver.RunGenerators(compilation);
+        var updatedSyntaxTree = CSharpSyntaxTree.ParseText(
+            """
+            namespace Macaron.PropertyAccessor.Tests;
+
+            public partial class Foo
+            {
+                [GetSet(setterName: "SetUpdated")]
+                private int _value;
+            }
+
+            public partial class Bar
+            {
+                [Get]
+                private int _value;
+            }
+            """
+        );
+        var updatedCompilation = compilation.ReplaceSyntaxTree(compilation.SyntaxTrees.Single(), updatedSyntaxTree);
+
+        driver = driver.RunGenerators(updatedCompilation);
+
+        var reasons = GetGenerationModelRunReasons(driver);
+        var generatedSources = driver.GetRunResult().Results.Single().GeneratedSources;
+
+        Assert.That(reasons.Count(reason => reason == IncrementalStepRunReason.Modified), Is.EqualTo(1));
+        Assert.That(reasons.Count(reason => reason == IncrementalStepRunReason.Cached), Is.EqualTo(1));
+        Assert.That(generatedSources.Any(source => source.SourceText.ToString().Contains("SetUpdated")), Is.True);
+        Assert.That(generatedSources.Any(source => source.SourceText.ToString().Contains("SetOriginal")), Is.False);
+    }
     #endregion
 }
