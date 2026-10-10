@@ -1,7 +1,7 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <AssemblyName>Macaron.PropertyAccessor.Core</AssemblyName>
+    <AssemblyName>Macaron.PropertyAccessor.Attribute</AssemblyName>
     <ImplicitUsings>enable</ImplicitUsings>
     <LangVersion>latest</LangVersion>
     <Nullable>enable</Nullable>
