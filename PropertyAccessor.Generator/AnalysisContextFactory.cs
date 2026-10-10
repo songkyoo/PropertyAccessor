@@ -2,6 +2,7 @@ using System.Collections.Immutable;
 using System.Text.RegularExpressions;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
 
 using static Macaron.PropertyAccessor.AttributeMetadataNames;
 using static Microsoft.CodeAnalysis.SymbolDisplayFormat;
@@ -42,10 +43,15 @@ internal static class AnalysisContextFactory
             return null;
         }
 
-        return generatorAttributeSyntaxContext.TargetSymbol is INamedTypeSymbol typeSymbol
+        return generatorAttributeSyntaxContext is
+            {
+                TargetSymbol: INamedTypeSymbol typeSymbol,
+                SemanticModel.Compilation: CSharpCompilation compilation,
+            }
             ? new PropertyGenerationDefaultsAttributeContext(
                 typeSymbol,
-                generatorAttributeSyntaxContext.Attributes
+                generatorAttributeSyntaxContext.Attributes,
+                compilation
             )
             : null;
     }
@@ -63,6 +69,7 @@ internal static class AnalysisContextFactory
         var defaultsAttributeByType = new Dictionary<INamedTypeSymbol, AttributeData>(
             SymbolEqualityComparer.Default
         );
+        var reportedNonPartialTypes = new HashSet<INamedTypeSymbol>(SymbolEqualityComparer.Default);
 
         AddAccessorAttributeContexts(getAttributeContexts);
         AddAccessorAttributeContexts(getSetAttributeContexts);
@@ -80,6 +87,11 @@ internal static class AnalysisContextFactory
                 defaultsAttributeContext.Symbol,
                 defaultsAttributeContext.Attributes[0]
             );
+
+            if (!compilationByType.ContainsKey(defaultsAttributeContext.Symbol))
+            {
+                compilationByType.Add(defaultsAttributeContext.Symbol, defaultsAttributeContext.Compilation);
+            }
         }
 
         var builder = ImmutableArray.CreateBuilder<AnalysisResult<TypeContext>>(compilationByType.Count);
@@ -90,6 +102,44 @@ internal static class AnalysisContextFactory
 
             var typeSymbol = entry.Key;
             var compilation = entry.Value;
+
+            var partialDiagnostics = ImmutableArray.CreateBuilder<Diagnostic>();
+            var hasNonPartialType = false;
+
+            for (var currentType = typeSymbol; currentType != null; currentType = currentType.ContainingType)
+            {
+                foreach (var syntaxReference in currentType.DeclaringSyntaxReferences)
+                {
+                    if (syntaxReference.GetSyntax(cancellationToken) is not TypeDeclarationSyntax declaration
+                        || declaration.Modifiers.Any(modifier => modifier.IsKind(SyntaxKind.PartialKeyword)))
+                    {
+                        continue;
+                    }
+
+                    hasNonPartialType = true;
+
+                    if (reportedNonPartialTypes.Add(currentType))
+                    {
+                        partialDiagnostics.Add(Diagnostic.Create(
+                            descriptor: Diagnostics.TypeMustBePartialRule,
+                            location: declaration.Identifier.GetLocation(),
+                            messageArgs: [currentType.Name]
+                        ));
+                    }
+
+                    break;
+                }
+            }
+
+            if (hasNonPartialType)
+            {
+                if (partialDiagnostics.Count > 0)
+                {
+                    builder.Add(new AnalysisResult<TypeContext>.Failure(partialDiagnostics.ToImmutable()));
+                }
+
+                continue;
+            }
 
             defaultsAttributeByType.TryGetValue(typeSymbol, out var defaultsAttribute);
             builder.Add(GetTypeContext(

@@ -15,7 +15,7 @@ dotnet pack ./PropertyAccessor/PropertyAccessor.csproj -c Release
 
 ## 사용법
 
-프로퍼티를 생성할 타입에는 `partial` 한정자를 추가해야 합니다. 필드에 `Get` 또는 `GetSet` 어트리뷰트를 적용하여 프로퍼티를 생성할 수 있습니다. 타입 안에서 공통으로 사용할 접근 한정자와 이름 규칙은 `PropertyGenerationDefaults` 어트리뷰트로 지정할 수 있습니다.
+프로퍼티를 생성할 타입과 이를 감싸는 모든 타입에는 `partial` 한정자를 추가해야 합니다. 필드에 `Get` 또는 `GetSet` 어트리뷰트를 적용하여 프로퍼티를 생성할 수 있습니다. 타입 안에서 공통으로 사용할 접근 한정자와 이름 규칙은 `PropertyGenerationDefaults` 어트리뷰트로 지정할 수 있습니다.
 
 ### Get, GetSet 어트리뷰트를 사용하기
 

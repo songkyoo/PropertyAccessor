@@ -8,6 +8,106 @@ namespace Macaron.PropertyAccessor.Tests;
 public class PropertyAccessorGeneratorDiagnosticTests
 {
     [Test]
+    public void Should_ReportDiagnosticAndNotGenerate_When_AccessorTypeIsNotPartial()
+    {
+        AssertGeneratedCode(
+            sourceCode:
+            """
+            namespace Macaron.PropertyAccessor.Tests;
+
+            public class Foo
+            {
+                [Get]
+                private int _answer;
+            }
+            """,
+            expected: "",
+            out var diagnostics
+        );
+
+        Assert.That(diagnostics.Count(diagnostic => diagnostic.Id == "MPROP0001"), Is.EqualTo(1));
+        Assert.That(diagnostics, Has.Some.Matches<Diagnostic>(diagnostic =>
+            diagnostic.Id == "MPROP0001"
+            && diagnostic.Severity == DiagnosticSeverity.Error
+            && diagnostic.GetMessage().Contains("Foo")
+            && diagnostic.Location.GetLineSpan().StartLinePosition.Line == 2
+        ));
+    }
+
+    [Test]
+    public void Should_ReportDiagnosticAndNotGenerate_When_ContainingTypeIsNotPartial()
+    {
+        AssertGeneratedCode(
+            sourceCode:
+            """
+            namespace Macaron.PropertyAccessor.Tests;
+
+            public class Outer
+            {
+                public partial class Inner
+                {
+                    [GetSet]
+                    private int _answer;
+                }
+            }
+            """,
+            expected: "",
+            out var diagnostics
+        );
+
+        Assert.That(diagnostics.Count(diagnostic => diagnostic.Id == "MPROP0001"), Is.EqualTo(1));
+        Assert.That(diagnostics, Has.Some.Matches<Diagnostic>(diagnostic =>
+            diagnostic.Id == "MPROP0001" && diagnostic.GetMessage().Contains("Outer")
+        ));
+    }
+
+    [Test]
+    public void Should_ReportContainingTypeOnlyOnce_When_MultipleNestedTypesUseAccessors()
+    {
+        AssertGeneratedCode(
+            sourceCode:
+            """
+            namespace Macaron.PropertyAccessor.Tests;
+
+            public class Outer
+            {
+                public partial class First
+                {
+                    [Get] private int _first;
+                }
+
+                public partial class Second
+                {
+                    [Get] private int _second;
+                }
+            }
+            """,
+            expected: "",
+            out var diagnostics
+        );
+
+        Assert.That(diagnostics.Count(diagnostic => diagnostic.Id == "MPROP0001"), Is.EqualTo(1));
+    }
+
+    [Test]
+    public void Should_ReportDiagnostic_When_DefaultsAttributeTypeIsNotPartial()
+    {
+        AssertGeneratedCode(
+            sourceCode:
+            """
+            namespace Macaron.PropertyAccessor.Tests;
+
+            [PropertyGenerationDefaults]
+            public class Foo { }
+            """,
+            expected: "",
+            out var diagnostics
+        );
+
+        Assert.That(diagnostics.Count(diagnostic => diagnostic.Id == "MPROP0001"), Is.EqualTo(1));
+    }
+
+    [Test]
     public void Should_ReportDiagnostic_When_FieldTypeCannotConvertToSpecifiedPropertyType()
     {
         AssertGeneratedCode(
@@ -26,7 +126,7 @@ public class PropertyAccessorGeneratorDiagnosticTests
         );
 
         Assert.That(diagnostics, Has.Some.Matches<Diagnostic>(diagnostic =>
-            diagnostic.Id == "MPROP0005" &&
+            diagnostic.Id == "MPROP0006" &&
             diagnostic.GetMessage().Contains("string") &&
             diagnostic.GetMessage().Contains("int")
         ));
@@ -70,7 +170,7 @@ public class PropertyAccessorGeneratorDiagnosticTests
         );
 
         Assert.That(diagnostics, Has.Some.Matches<Diagnostic>(diagnostic =>
-            diagnostic.Id == "MPROP0006"
+            diagnostic.Id == "MPROP0007"
             && diagnostic.Severity == DiagnosticSeverity.Error
             && diagnostic.GetMessage().Contains("_invalid")
         ));
@@ -93,7 +193,7 @@ public class PropertyAccessorGeneratorDiagnosticTests
             out var diagnostics
         );
 
-        Assert.That(diagnostics, Has.Some.Matches<Diagnostic>(diagnostic => diagnostic.Id == "MPROP0001"));
+        Assert.That(diagnostics, Has.Some.Matches<Diagnostic>(diagnostic => diagnostic.Id == "MPROP0002"));
     }
 
     [Test]
@@ -113,7 +213,7 @@ public class PropertyAccessorGeneratorDiagnosticTests
             out var diagnostics
         );
 
-        Assert.That(diagnostics, Has.Some.Matches<Diagnostic>(diagnostic => diagnostic.Id == "MPROP0002"));
+        Assert.That(diagnostics, Has.Some.Matches<Diagnostic>(diagnostic => diagnostic.Id == "MPROP0003"));
     }
 
     [Test]
@@ -136,7 +236,7 @@ public class PropertyAccessorGeneratorDiagnosticTests
         );
 
         Assert.That(diagnostics, Has.Some.Matches<Diagnostic>(diagnostic =>
-            diagnostic.Id == "MPROP0003" &&
+            diagnostic.Id == "MPROP0004" &&
             diagnostic.GetMessage().Contains("[invalid")
         ));
     }
@@ -232,7 +332,7 @@ public class PropertyAccessorGeneratorDiagnosticTests
             out var diagnostics
         );
 
-        Assert.That(diagnostics, Has.Some.Matches<Diagnostic>(diagnostic => diagnostic.Id == "MPROP0004"));
+        Assert.That(diagnostics, Has.Some.Matches<Diagnostic>(diagnostic => diagnostic.Id == "MPROP0005"));
     }
 
     [Test]
@@ -275,7 +375,7 @@ public class PropertyAccessorGeneratorDiagnosticTests
             out var diagnostics
         );
 
-        Assert.That(diagnostics.Count(diagnostic => diagnostic.Id == "MPROP0004"), Is.EqualTo(2));
+        Assert.That(diagnostics.Count(diagnostic => diagnostic.Id == "MPROP0005"), Is.EqualTo(2));
     }
 
     [Test]
@@ -315,7 +415,7 @@ public class PropertyAccessorGeneratorDiagnosticTests
             out var diagnostics
         );
 
-        Assert.That(diagnostics.Count(diagnostic => diagnostic.Id == "MPROP0007"), Is.EqualTo(1));
+        Assert.That(diagnostics.Count(diagnostic => diagnostic.Id == "MPROP0008"), Is.EqualTo(1));
     }
 
     [Test]
@@ -356,7 +456,7 @@ public class PropertyAccessorGeneratorDiagnosticTests
             out var diagnostics
         );
 
-        Assert.That(diagnostics.Count(diagnostic => diagnostic.Id == "MPROP0008"), Is.EqualTo(1));
+        Assert.That(diagnostics.Count(diagnostic => diagnostic.Id == "MPROP0009"), Is.EqualTo(1));
     }
 
     [Test]
@@ -407,6 +507,6 @@ public class PropertyAccessorGeneratorDiagnosticTests
             out var diagnostics
         );
 
-        Assert.That(diagnostics.Count(diagnostic => diagnostic.Id == "MPROP0009"), Is.EqualTo(4));
+        Assert.That(diagnostics.Count(diagnostic => diagnostic.Id == "MPROP0010"), Is.EqualTo(4));
     }
 }
