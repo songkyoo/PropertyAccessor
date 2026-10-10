@@ -141,11 +141,10 @@ internal static class AnalysisContextFactory
                 continue;
             }
 
-            defaultsAttributeByType.TryGetValue(typeSymbol, out var defaultsAttribute);
             builder.Add(GetTypeContext(
                 typeSymbol,
                 compilation,
-                defaultsAttribute,
+                defaultsAttributeByType,
                 cancellationToken
             ));
         }
@@ -243,21 +242,23 @@ internal static class AnalysisContextFactory
     private static AnalysisResult<TypeContext> GetTypeContext(
         INamedTypeSymbol typeSymbol,
         CSharpCompilation compilation,
-        AttributeData? defaultsAttribute,
+        IReadOnlyDictionary<INamedTypeSymbol, AttributeData> defaultsAttributeByType,
         CancellationToken cancellationToken
     )
     {
-        var prefixPatternArgument = GetNamedArgumentValue(
-            defaultsAttribute,
-            nameof(PropertyGenerationDefaultsAttribute.PrefixPattern)
+        var prefixPatternArgument = GetInheritedNamedArgumentValue(
+            typeSymbol,
+            defaultsAttributeByType,
+            name: nameof(PropertyGenerationDefaultsAttribute.PrefixPattern),
+            includeNull: true,
+            out var prefixDefaultsAttribute
         );
-        var typeLevelPrefixRegex = GetPrefixRegex(prefixPatternArgument);
 
-        if (typeLevelPrefixRegex == null)
+        if (!TryGetPrefixRegex(prefixPatternArgument, out var typeLevelPrefixRegex))
         {
             return new AnalysisResult<TypeContext>.Failure(Diagnostic.Create(
                 descriptor: Diagnostics.InvalidPrefixPatternRule,
-                location: defaultsAttribute?
+                location: prefixDefaultsAttribute?
                     .ApplicationSyntaxReference?
                     .GetSyntax(cancellationToken)
                     .GetLocation(),
@@ -267,14 +268,16 @@ internal static class AnalysisContextFactory
 
         return new AnalysisResult<TypeContext>.Success(new TypeContext(
             Symbol: typeSymbol,
-            AccessModifier: GetAccessModifier(GetNamedArgumentValue(
-                defaultsAttribute,
-                nameof(PropertyGenerationDefaultsAttribute.AccessModifier)
+            AccessModifier: GetAccessModifier(GetInheritedNamedArgumentValue(
+                typeSymbol,
+                defaultsAttributeByType,
+                name: nameof(PropertyGenerationDefaultsAttribute.AccessModifier)
             )),
             PrefixRegex: typeLevelPrefixRegex,
-            NamingRule: GetNamingRule(GetNamedArgumentValue(
-                defaultsAttribute,
-                nameof(PropertyGenerationDefaultsAttribute.NamingRule)
+            NamingRule: GetNamingRule(GetInheritedNamedArgumentValue(
+                typeSymbol,
+                defaultsAttributeByType,
+                name: nameof(PropertyGenerationDefaultsAttribute.NamingRule)
             )),
             Compilation: compilation
         ));
@@ -283,7 +286,7 @@ internal static class AnalysisContextFactory
     private static AnalysisResult<PropertyModel>? GetPropertyModel(
         IFieldSymbol fieldSymbol,
         PropertyAccessModifier accessModifier,
-        Regex prefixRegex,
+        Regex? prefixRegex,
         PropertyNamingRule namingRule,
         CSharpCompilation compilation,
         CancellationToken cancellationToken
@@ -517,11 +520,12 @@ internal static class AnalysisContextFactory
 
     private static string GetPropertyName(
         string fieldName,
-        Regex prefixRegex,
+        Regex? prefixRegex,
         PropertyNamingRule namingRule
     )
     {
-        var prefixRemovedName = prefixRegex.Replace(input: fieldName, replacement: "", count: 1);
+        var prefixRemovedName = prefixRegex?.Replace(input: fieldName, replacement: "", count: 1)
+            ?? fieldName;
 
         if (prefixRemovedName.Length < 1)
         {
@@ -563,6 +567,46 @@ internal static class AnalysisContextFactory
         return null;
     }
 
+    private static object? GetInheritedNamedArgumentValue(
+        INamedTypeSymbol typeSymbol,
+        IReadOnlyDictionary<INamedTypeSymbol, AttributeData> defaultsAttributeByType,
+        string name
+    )
+    {
+        return GetInheritedNamedArgumentValue(typeSymbol, defaultsAttributeByType, name, includeNull: false, out _);
+    }
+
+    private static object? GetInheritedNamedArgumentValue(
+        INamedTypeSymbol typeSymbol,
+        IReadOnlyDictionary<INamedTypeSymbol, AttributeData> defaultsAttributeByType,
+        string name,
+        bool includeNull,
+        out AttributeData? definingAttribute
+    )
+    {
+        for (var currentType = typeSymbol; currentType != null; currentType = currentType.ContainingType)
+        {
+            if (!defaultsAttributeByType.TryGetValue(currentType, out var attribute))
+            {
+                continue;
+            }
+
+            foreach (var namedArgument in attribute.NamedArguments)
+            {
+                if (namedArgument.Key == name && (includeNull || namedArgument.Value.Value != null))
+                {
+                    definingAttribute = attribute;
+
+                    return namedArgument.Value.Value;
+                }
+            }
+        }
+
+        definingAttribute = null;
+
+        return null;
+    }
+
     private static PropertyAccessModifier GetAccessModifier(
         object? value,
         PropertyAccessModifier defaultValue = PropertyAccessModifier.Public
@@ -579,17 +623,33 @@ internal static class AnalysisContextFactory
         return isDefined && accessModifier != PropertyAccessModifier.Default ? accessModifier : defaultValue;
     }
 
-    private static Regex? GetPrefixRegex(object? value, Regex? defaultValue = null)
+    private static bool TryGetPrefixRegex(object? value, out Regex? prefixRegex)
     {
+        if (value == null)
+        {
+            prefixRegex = DefaultRegex;
+            return true;
+        }
+
+        if (value is "")
+        {
+            prefixRegex = null;
+            return true;
+        }
+
         try
         {
-            return value is string stringValue && !stringValue.AsSpan().Trim().IsEmpty
-                ? new Regex($"{(stringValue[0] == '^' ? "" : "^")}{stringValue}")
-                : defaultValue ?? DefaultRegex;
+            var stringValue = (string)value;
+
+            prefixRegex = new Regex($"{(stringValue[0] == '^' ? "" : "^")}{stringValue}");
+
+            return true;
         }
         catch
         {
-            return null;
+            prefixRegex = null;
+
+            return false;
         }
     }
 

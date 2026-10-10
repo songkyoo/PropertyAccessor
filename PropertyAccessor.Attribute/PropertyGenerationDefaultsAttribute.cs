@@ -8,7 +8,7 @@ public sealed class PropertyGenerationDefaultsAttribute : Attribute
 {
     public PropertyAccessModifier AccessModifier { get; set; } = PropertyAccessModifier.Default;
 
-    public string PrefixPattern { get; set; } = "";
+    public string? PrefixPattern { get; set; }
 
     public PropertyNamingRule NamingRule { get; set; } = PropertyNamingRule.Default;
 }

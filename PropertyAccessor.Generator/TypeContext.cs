@@ -7,7 +7,7 @@ namespace Macaron.PropertyAccessor;
 public sealed record TypeContext(
     INamedTypeSymbol Symbol,
     PropertyAccessModifier AccessModifier,
-    Regex PrefixRegex,
+    Regex? PrefixRegex,
     PropertyNamingRule NamingRule,
     CSharpCompilation Compilation
 );

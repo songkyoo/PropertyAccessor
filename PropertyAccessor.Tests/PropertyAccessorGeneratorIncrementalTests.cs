@@ -158,5 +158,66 @@ public class PropertyAccessorGeneratorIncrementalTests
         Assert.That(generatedSources.Any(source => source.SourceText.ToString().Contains("SetUpdated")), Is.True);
         Assert.That(generatedSources.Any(source => source.SourceText.ToString().Contains("SetOriginal")), Is.False);
     }
+
+    [Test]
+    public void Should_OnlyModifyNestedGenerationModel_When_ContainingDefaultsChange()
+    {
+        var compilation = CreateCompilation(
+            """
+            namespace Macaron.PropertyAccessor.Tests;
+
+            [PropertyGenerationDefaults(AccessModifier = PropertyAccessModifier.Protected)]
+            public partial class Outer
+            {
+                public partial class Inner
+                {
+                    [Get]
+                    private int _value;
+                }
+            }
+
+            public partial class Other
+            {
+                [Get]
+                private int _value;
+            }
+            """
+        );
+        var driver = CreateGeneratorDriver(trackIncrementalGeneratorSteps: true);
+
+        driver = driver.RunGenerators(compilation);
+
+        var updatedSyntaxTree = CSharpSyntaxTree.ParseText(
+            """
+            namespace Macaron.PropertyAccessor.Tests;
+
+            [PropertyGenerationDefaults(AccessModifier = PropertyAccessModifier.Internal)]
+            public partial class Outer
+            {
+                public partial class Inner
+                {
+                    [Get]
+                    private int _value;
+                }
+            }
+
+            public partial class Other
+            {
+                [Get]
+                private int _value;
+            }
+            """
+        );
+        var updatedCompilation = compilation.ReplaceSyntaxTree(compilation.SyntaxTrees.Single(), updatedSyntaxTree);
+
+        driver = driver.RunGenerators(updatedCompilation);
+
+        var reasons = GetGenerationModelRunReasons(driver);
+        var generatedSources = driver.GetRunResult().Results.Single().GeneratedSources;
+
+        Assert.That(reasons.Count(reason => reason == IncrementalStepRunReason.Modified), Is.EqualTo(1));
+        Assert.That(reasons.Count(reason => reason == IncrementalStepRunReason.Cached), Is.EqualTo(1));
+        Assert.That(generatedSources.Any(source => source.SourceText.ToString().Contains("internal int Value")), Is.True);
+    }
     #endregion
 }

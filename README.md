@@ -141,7 +141,7 @@ partial class Foo
 `PropertyGenerationDefaults`는 해당 타입에서 생성되는 프로퍼티에 적용할 기본 옵션을 지정합니다.
 
 - `AccessModifier` PropertyAccessModifier: 프로퍼티를 생성할 때 사용할 접근 한정자를 지정합니다. 기본값은 `Public`입니다.
-- `PrefixPattern` string: 필드 이름에서 제거할 접두어를 나타내는 정규식 문자열입니다. 기본값은 `^(_|m_)`입니다.
+- `PrefixPattern` string?: 필드 이름에서 제거할 접두어를 나타내는 정규식 문자열입니다. 기본값은 `null`로 기본값을 지정하면 `^(_|m_)`를 사용합니다. 빈 문자열을 지정하면 접두어 제거를 수행하지 않습니다.
 - `NamingRule` PropertyNamingRule: 접두어를 제거한 필드 이름을 어떻게 변경할지 결정합니다. 기본값은 `PascalCase`입니다.
 
 ```csharp
@@ -174,7 +174,7 @@ partial class Foo
 }
 ```
 
-`PropertyGenerationDefaults`는 지정된 타입에만 적용되며 중첩 타입에는 상속되지 않습니다.
+중첩 타입은 각 옵션을 자신에게 가장 가까운 바깥 타입부터 찾아 상속합니다. 중첩 타입에 지정한 옵션만 바깥 타입의 값을 덮어씁니다. `PrefixPattern`을 생략하면 바깥 타입의 값을 따르고, 바깥 타입에도 설정이 없으면 기본 정규식을 사용합니다. `PrefixPattern = null`은 상속을 끊고 기본 정규식을 사용하며, `PrefixPattern = ""`은 정규식을 사용하지 않습니다. 다른 옵션을 라이브러리 기본값으로 되돌리려면 `AccessModifier = PropertyAccessModifier.Public`, `NamingRule = PropertyNamingRule.PascalCase`를 명시합니다.
 
 ```csharp
 using Macaron.PropertyAccessor;
@@ -192,7 +192,7 @@ public partial class Foo
  
     public partial class Bar
     {
-        // 외부 타입의 기본 설정을 적용하지 않기 때문에 프로퍼티 이름은 FAge가 됩니다.
+        // 외부 타입의 설정을 상속하므로 프로퍼티 이름은 age가 됩니다.
         [Get]
         public int fAge;
     }
