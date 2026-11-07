@@ -94,7 +94,8 @@ internal static class SourceGenerationHelpers
             accessorKind,
             getterRequiresExplicitConversion,
             isInitAccessor,
-            setterMethodName
+            setterMethodName,
+            isOverride
         ) = propertyModel;
 
         if (accessorKind == PropertyAccessorKind.None)
@@ -106,7 +107,9 @@ internal static class SourceGenerationHelpers
         var escapedPropertyName = GetEscapedIdentifier(propertyName);
         var builder = ImmutableArray.CreateBuilder<string>();
 
-        builder.Add($"{GetAccessorModifier(accessModifier)} {propertyTypeName} {escapedPropertyName}");
+        var overrideModifier = isOverride ? "override " : "";
+
+        builder.Add($"{GetAccessorModifier(accessModifier)} {overrideModifier}{propertyTypeName} {escapedPropertyName}");
         builder.Add("{");
 
         if (accessorKind is PropertyAccessorKind.Get or PropertyAccessorKind.GetSet)

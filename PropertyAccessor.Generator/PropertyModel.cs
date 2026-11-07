@@ -8,5 +8,6 @@ internal sealed record PropertyModel(
     PropertyAccessorKind AccessorKind,
     bool GetterRequiresExplicitConversion,
     bool IsInitAccessor,
-    string? SetterMethodName
+    string? SetterMethodName,
+    bool IsOverride
 );

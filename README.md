@@ -136,6 +136,37 @@ partial class Foo
 
 `readonly` 필드에는 사용할 수 없고 기존 멤버나 생성되는 멤버와 이름이 동일하면 안 됩니다. 매개변수 타입이 다른 메서드 오버로드는 가능합니다.
 
+### 상속 프로퍼티 자동 override
+
+생성할 프로퍼티와 이름·타입이 같은 `abstract`, `abstract override` 인스턴스 프로퍼티가 상속 계층에 존재한다면 `override`를 추가합니다.
+
+```csharp
+using Macaron.PropertyAccessor;
+
+public abstract class CounterBase
+{
+    public abstract int Count { get; set; }
+}
+
+public partial class Counter : CounterBase
+{
+    [GetSet]
+    private int _count;
+}
+```
+
+위 코드는 다음과 같은 코드를 생성합니다.
+
+```csharp
+public override int Count
+{
+    get => _count;
+    set => _count = value;
+}
+```
+
+프로퍼티와 각 접근자의 접근 제한자, `get`·`set`·`init` 구성이 모두 일치해야 합니다. 예를 들어 기반 프로퍼티가 `get; set;`이면 `[Get]`은 사용할 수 없고, `get; init;`이면 readonly 필드의 `[GetSet]`이 필요합니다. 기존 설정을 기반 프로퍼티에 맞춰 자동으로 변경하지 않습니다.
+
 ### PropertyGenerationDefaults 옵션
 
 `PropertyGenerationDefaults`는 해당 타입에서 생성되는 프로퍼티에 적용할 기본 옵션을 지정합니다.

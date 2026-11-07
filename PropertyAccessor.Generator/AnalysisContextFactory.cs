@@ -437,7 +437,7 @@ internal static class AnalysisContextFactory
             | UseSpecialTypes
         ));
 
-        return new AnalysisResult<PropertyModel>.Success(new PropertyModel(
+        var propertyModel = new PropertyModel(
             FieldName: fieldName,
             AccessModifier: GetAccessModifier(
                 GetNamedArgumentValue(shapeAttribute, nameof(GetAttribute.AccessModifier)),
@@ -448,8 +448,17 @@ internal static class AnalysisContextFactory
             AccessorKind: accessorKind,
             GetterRequiresExplicitConversion: getterRequiresExplicitConversion,
             IsInitAccessor: fieldSymbol.IsReadOnly,
-            SetterMethodName: setterMethodName
-        ));
+            SetterMethodName: setterMethodName,
+            IsOverride: false
+        );
+
+        return PropertyOverrideAnalysis.ApplyOverride(
+            fieldSymbol,
+            typeSymbol,
+            propertyModel,
+            compilation,
+            cancellationToken
+        );
     }
 
     private static bool IsValidSetterMethodName(string name)

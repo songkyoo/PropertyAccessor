@@ -70,14 +70,22 @@ public sealed class PropertyAccessorGenerator : IIncrementalGenerator
                     typeAnalysisResults,
                     cancellationToken
                 );
-            })
-            .SelectMany(static (analysisResults, _) => analysisResults);
+            });
+
         var diagnosticProvider = analysisResultProvider
-            .Where(static result => result is AnalysisResult<GenerationModel>.Failure)
-            .SelectMany(static (result, _) => ((AnalysisResult<GenerationModel>.Failure)result).Diagnostics);
+            .SelectMany(static (analysisResults, _) =>
+            {
+                return analysisResults
+                    .OfType<AnalysisResult<GenerationModel>.Failure>()
+                    .SelectMany(failure => failure.Diagnostics);
+            });
         var generationModelProvider = analysisResultProvider
-            .Where(static result => result is AnalysisResult<GenerationModel>.Success)
-            .Select(static (result, _) => ((AnalysisResult<GenerationModel>.Success)result).Model)
+            .SelectMany(static (analysisResults, _) => analysisResults)
+            // 실패한 항목도 null로 유지해야 Roslyn 4.3에서 제거·복구 시 추적 예외 없이 캐시를 재사용한다.
+            .Select(static (result, _) => result is AnalysisResult<GenerationModel>.Success success
+                ? success.Model
+                : null
+            )
             .WithTrackingName("GenerationModel");
 
         context.RegisterSourceOutput(diagnosticProvider, static (sourceProductionContext, diagnostic) =>
@@ -86,6 +94,11 @@ public sealed class PropertyAccessorGenerator : IIncrementalGenerator
         });
         context.RegisterSourceOutput(generationModelProvider, static (sourceProductionContext, generationModel) =>
         {
+            if (generationModel == null)
+            {
+                return;
+            }
+
             var sourceText = SourceGenerationHelpers.GetSource(generationModel);
 
             sourceProductionContext.AddSource(
