@@ -443,7 +443,7 @@ public class PropertyAccessorGeneratorOverrideTests
             """,
             out var diagnostics
         );
-        var overrideDiagnostic = diagnostics.Single(diagnostic => diagnostic.Id == "MPROP0011");
+        var overrideDiagnostic = diagnostics.Single(diagnostic => diagnostic.Id == "MAPA0011");
         var message = overrideDiagnostic.GetMessage();
         var diagnosticText = sourceCode.Substring(
             overrideDiagnostic.Location.SourceSpan.Start,
@@ -480,7 +480,7 @@ public class PropertyAccessorGeneratorOverrideTests
         var diagnostic = result.Diagnostics.Single();
 
         Assert.That(result.GeneratedSources, Is.Empty);
-        Assert.That(diagnostic.Id, Is.EqualTo("MPROP0011"));
+        Assert.That(diagnostic.Id, Is.EqualTo("MAPA0011"));
         Assert.That(diagnostic.GetMessage(), Does.Contain("ref-returning"));
     }
 
@@ -513,7 +513,7 @@ public class PropertyAccessorGeneratorOverrideTests
         var diagnostic = result.Diagnostics.Single();
 
         Assert.That(result.GeneratedSources, Is.Empty);
-        Assert.That(diagnostic.Id, Is.EqualTo("MPROP0011"));
+        Assert.That(diagnostic.Id, Is.EqualTo("MAPA0011"));
         Assert.That(diagnostic.GetMessage(), Does.Contain("required"));
     }
 

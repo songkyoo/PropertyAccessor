@@ -25,9 +25,9 @@ public class PropertyAccessorGeneratorDiagnosticTests
             out var diagnostics
         );
 
-        Assert.That(diagnostics.Count(diagnostic => diagnostic.Id == "MPROP0001"), Is.EqualTo(1));
+        Assert.That(diagnostics.Count(diagnostic => diagnostic.Id == "MAPA0001"), Is.EqualTo(1));
         Assert.That(diagnostics, Has.Some.Matches<Diagnostic>(diagnostic =>
-            diagnostic.Id == "MPROP0001"
+            diagnostic.Id == "MAPA0001"
             && diagnostic.Severity == DiagnosticSeverity.Error
             && diagnostic.GetMessage().Contains("Foo")
             && diagnostic.Location.GetLineSpan().StartLinePosition.Line == 2
@@ -55,9 +55,9 @@ public class PropertyAccessorGeneratorDiagnosticTests
             out var diagnostics
         );
 
-        Assert.That(diagnostics.Count(diagnostic => diagnostic.Id == "MPROP0001"), Is.EqualTo(1));
+        Assert.That(diagnostics.Count(diagnostic => diagnostic.Id == "MAPA0001"), Is.EqualTo(1));
         Assert.That(diagnostics, Has.Some.Matches<Diagnostic>(diagnostic =>
-            diagnostic.Id == "MPROP0001" && diagnostic.GetMessage().Contains("Outer")
+            diagnostic.Id == "MAPA0001" && diagnostic.GetMessage().Contains("Outer")
         ));
     }
 
@@ -86,7 +86,7 @@ public class PropertyAccessorGeneratorDiagnosticTests
             out var diagnostics
         );
 
-        Assert.That(diagnostics.Count(diagnostic => diagnostic.Id == "MPROP0001"), Is.EqualTo(1));
+        Assert.That(diagnostics.Count(diagnostic => diagnostic.Id == "MAPA0001"), Is.EqualTo(1));
     }
 
     [Test]
@@ -104,7 +104,7 @@ public class PropertyAccessorGeneratorDiagnosticTests
             out var diagnostics
         );
 
-        Assert.That(diagnostics.Count(diagnostic => diagnostic.Id == "MPROP0001"), Is.EqualTo(1));
+        Assert.That(diagnostics.Count(diagnostic => diagnostic.Id == "MAPA0001"), Is.EqualTo(1));
     }
 
     [Test]
@@ -125,7 +125,7 @@ public class PropertyAccessorGeneratorDiagnosticTests
             out var diagnostics
         );
 
-        var diagnostic = diagnostics.Single(diagnostic => diagnostic.Id == "MPROP0006");
+        var diagnostic = diagnostics.Single(diagnostic => diagnostic.Id == "MAPA0006");
         var location = diagnostic.Location.GetLineSpan().StartLinePosition;
 
         Assert.That(diagnostic.Severity, Is.EqualTo(DiagnosticSeverity.Error));
@@ -171,7 +171,7 @@ public class PropertyAccessorGeneratorDiagnosticTests
         );
 
         Assert.That(diagnostics, Has.Some.Matches<Diagnostic>(diagnostic =>
-            diagnostic.Id == "MPROP0007"
+            diagnostic.Id == "MAPA0007"
             && diagnostic.Severity == DiagnosticSeverity.Error
             && diagnostic.GetMessage().Contains("_invalid")
         ));
@@ -194,7 +194,7 @@ public class PropertyAccessorGeneratorDiagnosticTests
             out var diagnostics
         );
 
-        Assert.That(diagnostics, Has.Some.Matches<Diagnostic>(diagnostic => diagnostic.Id == "MPROP0002"));
+        Assert.That(diagnostics, Has.Some.Matches<Diagnostic>(diagnostic => diagnostic.Id == "MAPA0002"));
     }
 
     [Test]
@@ -214,7 +214,7 @@ public class PropertyAccessorGeneratorDiagnosticTests
             out var diagnostics
         );
 
-        Assert.That(diagnostics, Has.Some.Matches<Diagnostic>(diagnostic => diagnostic.Id == "MPROP0003"));
+        Assert.That(diagnostics, Has.Some.Matches<Diagnostic>(diagnostic => diagnostic.Id == "MAPA0003"));
     }
 
     [Test]
@@ -237,7 +237,7 @@ public class PropertyAccessorGeneratorDiagnosticTests
         );
 
         Assert.That(diagnostics, Has.Some.Matches<Diagnostic>(diagnostic =>
-            diagnostic.Id == "MPROP0004" &&
+            diagnostic.Id == "MAPA0004" &&
             diagnostic.GetMessage().Contains("[invalid")
         ));
     }
@@ -333,7 +333,7 @@ public class PropertyAccessorGeneratorDiagnosticTests
             out var diagnostics
         );
 
-        Assert.That(diagnostics, Has.Some.Matches<Diagnostic>(diagnostic => diagnostic.Id == "MPROP0005"));
+        Assert.That(diagnostics, Has.Some.Matches<Diagnostic>(diagnostic => diagnostic.Id == "MAPA0005"));
     }
 
     [Test]
@@ -376,7 +376,7 @@ public class PropertyAccessorGeneratorDiagnosticTests
             out var diagnostics
         );
 
-        Assert.That(diagnostics.Count(diagnostic => diagnostic.Id == "MPROP0005"), Is.EqualTo(2));
+        Assert.That(diagnostics.Count(diagnostic => diagnostic.Id == "MAPA0005"), Is.EqualTo(2));
     }
 
     [Test]
@@ -416,7 +416,7 @@ public class PropertyAccessorGeneratorDiagnosticTests
             out var diagnostics
         );
 
-        Assert.That(diagnostics.Count(diagnostic => diagnostic.Id == "MPROP0008"), Is.EqualTo(1));
+        Assert.That(diagnostics.Count(diagnostic => diagnostic.Id == "MAPA0008"), Is.EqualTo(1));
     }
 
     [Test]
@@ -457,7 +457,7 @@ public class PropertyAccessorGeneratorDiagnosticTests
             out var diagnostics
         );
 
-        Assert.That(diagnostics.Count(diagnostic => diagnostic.Id == "MPROP0009"), Is.EqualTo(1));
+        Assert.That(diagnostics.Count(diagnostic => diagnostic.Id == "MAPA0009"), Is.EqualTo(1));
     }
 
     [Test]
@@ -509,7 +509,7 @@ public class PropertyAccessorGeneratorDiagnosticTests
         );
 
         var messages = diagnostics
-            .Where(diagnostic => diagnostic.Id == "MPROP0010")
+            .Where(diagnostic => diagnostic.Id == "MAPA0010")
             .Select(diagnostic => diagnostic.GetMessage());
         string[] expectedMessages =
         [

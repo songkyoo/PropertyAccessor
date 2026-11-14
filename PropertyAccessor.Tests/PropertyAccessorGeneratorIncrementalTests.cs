@@ -334,7 +334,7 @@ public class PropertyAccessorGeneratorIncrementalTests
         var remainingSource = mismatchResult.GeneratedSources.Single().SourceText.ToString();
         var reasons = GetGenerationModelRunReasons(driver);
 
-        Assert.That(diagnostic.Id, Is.EqualTo("MPROP0011"));
+        Assert.That(diagnostic.Id, Is.EqualTo("MAPA0011"));
         Assert.That(remainingSource, Does.Contain("partial class Unrelated"));
         Assert.That(reasons, Does.Contain(IncrementalStepRunReason.Cached));
 
@@ -378,7 +378,7 @@ public class PropertyAccessorGeneratorIncrementalTests
 
         var initialResult = driver.GetRunResult().Results.Single();
 
-        Assert.That(initialResult.Diagnostics.Single().Id, Is.EqualTo("MPROP0011"));
+        Assert.That(initialResult.Diagnostics.Single().Id, Is.EqualTo("MAPA0011"));
         Assert.That(initialResult.GeneratedSources, Is.Empty);
 
         var updatedBaseTree = CSharpSyntaxTree.ParseText(

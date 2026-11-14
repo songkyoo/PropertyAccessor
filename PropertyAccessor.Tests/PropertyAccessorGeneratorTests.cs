@@ -676,7 +676,7 @@ public class PropertyAccessorGeneratorTests
             out var diagnostics
         );
 
-        Assert.That(diagnostics, Has.None.Matches<Diagnostic>(diagnostic => diagnostic.Id.StartsWith("MPROP")));
+        Assert.That(diagnostics, Has.None.Matches<Diagnostic>(diagnostic => diagnostic.Id.StartsWith("MAPA")));
     }
 
     [Test]

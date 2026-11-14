@@ -144,10 +144,10 @@ public class PropertyAccessorGeneratorProjectDefaultsTests
         Assert.That(type.GetMembers("M_value"), Has.One.InstanceOf<IPropertySymbol>());
     }
 
-    [TestCase("access_modifier", "2", "MPROP0012")]
-    [TestCase("access_modifier", "File", "MPROP0012")]
-    [TestCase("naming_rule", "Unknown", "MPROP0012")]
-    [TestCase("prefix_pattern", "[invalid", "MPROP0004")]
+    [TestCase("access_modifier", "2", "MAPA0012")]
+    [TestCase("access_modifier", "File", "MAPA0012")]
+    [TestCase("naming_rule", "Unknown", "MAPA0012")]
+    [TestCase("prefix_pattern", "[invalid", "MAPA0004")]
     public void Should_ReportInvalidProjectOptionOnceAndUseBuiltInDefault(string key, string value, string diagnosticId)
     {
         var compilation = CreateCompilation(
@@ -264,7 +264,7 @@ public class PropertyAccessorGeneratorProjectDefaultsTests
             .SelectMany(step => step.Outputs)
             .Single(output => output.Value != null);
 
-        Assert.That(invalidResult.Diagnostics.Single().Id, Is.EqualTo("MPROP0012"));
+        Assert.That(invalidResult.Diagnostics.Single().Id, Is.EqualTo("MAPA0012"));
         Assert.That(invalidGeneration.Reason, Is.EqualTo(IncrementalStepRunReason.Cached));
         Assert.That(correctedResult.Diagnostics, Is.Empty);
         Assert.That(correctedResult.GeneratedSources, Has.Length.EqualTo(1));

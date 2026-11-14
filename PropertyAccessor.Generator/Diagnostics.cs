@@ -8,7 +8,7 @@ namespace Macaron.PropertyAccessor;
 internal static class Diagnostics
 {
     private static readonly DiagnosticDescriptor TypeMustBePartialRule = new(
-        id: "MPROP0001",
+        id: "MAPA0001",
         title: "Type must be partial",
         messageFormat: "Type '{0}' must be partial to generate properties.",
         category: "Usage",
@@ -17,7 +17,7 @@ internal static class Diagnostics
     );
 
     private static readonly DiagnosticDescriptor InvalidPropertyNameAfterPrefixRemovalRule = new(
-        id: "MPROP0002",
+        id: "MAPA0002",
         title: "Cannot generate property name after prefix removal",
         messageFormat: "Field '{0}' with prefix pattern '{1}' results in an empty property name.",
         category: "Naming",
@@ -26,7 +26,7 @@ internal static class Diagnostics
     );
 
     private static readonly DiagnosticDescriptor PropertyNameSameAsFieldNameRule = new(
-        id: "MPROP0003",
+        id: "MAPA0003",
         title: "Generated property name is same as field name",
         messageFormat: "Field '{0}' with prefix pattern '{1}' results in property name '{2}', which is the same as the field name.",
         category: "Naming",
@@ -35,7 +35,7 @@ internal static class Diagnostics
     );
 
     private static readonly DiagnosticDescriptor InvalidPrefixPatternRule = new(
-        id: "MPROP0004",
+        id: "MAPA0004",
         title: "Invalid prefix pattern",
         messageFormat: "Prefix pattern '{0}' is not a valid regular expression.",
         category: "Usage",
@@ -44,7 +44,7 @@ internal static class Diagnostics
     );
 
     private static readonly DiagnosticDescriptor StaticFieldNotSupportedRule = new(
-        id: "MPROP0005",
+        id: "MAPA0005",
         title: "Static fields are not supported",
         messageFormat: "Field '{0}' must not be static.",
         category: "Usage",
@@ -53,7 +53,7 @@ internal static class Diagnostics
     );
 
     private static readonly DiagnosticDescriptor InvalidGetterConversionRule = new(
-        id: "MPROP0006",
+        id: "MAPA0006",
         title: "Field type cannot be converted to property type",
         messageFormat: "Field '{0}' of type '{1}' cannot be cast to property type '{2}'.",
         category: "Usage",
@@ -62,7 +62,7 @@ internal static class Diagnostics
     );
 
     private static readonly DiagnosticDescriptor ConflictingAccessorAttributesRule = new(
-        id: "MPROP0007",
+        id: "MAPA0007",
         title: "Get and GetSet cannot be used together",
         messageFormat: "Field '{0}' cannot declare both [Get] and [GetSet].",
         category: "Usage",
@@ -71,7 +71,7 @@ internal static class Diagnostics
     );
 
     private static readonly DiagnosticDescriptor InvalidSetterMethodNameRule = new(
-        id: "MPROP0008",
+        id: "MAPA0008",
         title: "Invalid setter method name",
         messageFormat: "Field '{0}' has an invalid setter method name '{1}'.",
         category: "Naming",
@@ -80,7 +80,7 @@ internal static class Diagnostics
     );
 
     private static readonly DiagnosticDescriptor ReadonlySetterMethodRule = new(
-        id: "MPROP0009",
+        id: "MAPA0009",
         title: "Cannot generate setter method for readonly field",
         messageFormat: "Field '{0}' is readonly and cannot be assigned by setter method '{1}'.",
         category: "Usage",
@@ -89,7 +89,7 @@ internal static class Diagnostics
     );
 
     private static readonly DiagnosticDescriptor ConflictingSetterMethodRule = new(
-        id: "MPROP0010",
+        id: "MAPA0010",
         title: "Setter method conflicts with another member",
         messageFormat: "Setter method '{0}' for field '{1}' conflicts with another member.",
         category: "Naming",
@@ -98,7 +98,7 @@ internal static class Diagnostics
     );
 
     private static readonly DiagnosticDescriptor IncompatiblePropertyOverrideRule = new(
-        id: "MPROP0011",
+        id: "MAPA0011",
         title: "Generated property cannot override inherited property",
         messageFormat: "Generated property '{0}' for field '{1}' cannot override '{2}': {3}.",
         category: "Usage",
@@ -107,7 +107,7 @@ internal static class Diagnostics
     );
 
     private static readonly DiagnosticDescriptor InvalidProjectOptionRule = new(
-        id: "MPROP0012",
+        id: "MAPA0012",
         title: "Invalid project generation option",
         messageFormat: "Project generation option '{0}' has an invalid value '{1}'.",
         category: "Usage",
