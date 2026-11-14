@@ -83,10 +83,9 @@ internal static class TypeContextFactory
 
                     if (reportedNonPartialTypes.Add(currentType))
                     {
-                        partialDiagnostics.Add(Diagnostic.Create(
-                            descriptor: Diagnostics.TypeMustBePartialRule,
-                            location: declaration.Identifier.GetLocation(),
-                            messageArgs: [currentType.Name]
+                        partialDiagnostics.Add(Diagnostics.TypeMustBePartial(
+                            typeName: currentType.Name,
+                            location: declaration.Identifier.GetLocation()
                         ));
                     }
 

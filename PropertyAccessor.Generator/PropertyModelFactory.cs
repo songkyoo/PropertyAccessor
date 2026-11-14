@@ -61,10 +61,9 @@ internal static class PropertyModelFactory
 
             if (HasSetterMethodConflict(typeSymbol, field, setterMethodName, candidates, fields, i))
             {
-                builder[i] = new AnalysisResult<PropertyModel>.Failure(Diagnostic.Create(
-                    descriptor: Diagnostics.ConflictingSetterMethodRule,
-                    location: field.Locations.FirstOrDefault(),
-                    messageArgs: [setterMethodName, field.Name]
+                builder[i] = new AnalysisResult<PropertyModel>.Failure(Diagnostics.ConflictingSetterMethod(
+                    field,
+                    setterMethodName
                 ));
             }
         }
@@ -127,20 +126,12 @@ internal static class PropertyModelFactory
 
         if (getAttribute != null && getSetAttribute != null)
         {
-            return new AnalysisResult<PropertyModel>.Failure(Diagnostic.Create(
-                descriptor: Diagnostics.ConflictingAccessorAttributesRule,
-                location: fieldSymbol.Locations.FirstOrDefault(),
-                messageArgs: [fieldName]
-            ));
+            return new AnalysisResult<PropertyModel>.Failure(Diagnostics.ConflictingAccessorAttributes(fieldSymbol));
         }
 
         if (fieldSymbol.IsStatic && accessorKind != PropertyAccessorKind.None)
         {
-            return new AnalysisResult<PropertyModel>.Failure(Diagnostic.Create(
-                descriptor: Diagnostics.StaticFieldNotSupportedRule,
-                location: fieldSymbol.Locations.FirstOrDefault(),
-                messageArgs: [fieldName]
-            ));
+            return new AnalysisResult<PropertyModel>.Failure(Diagnostics.StaticFieldNotSupported(fieldSymbol));
         }
 
         var typeSymbol = fieldTypeSymbol;
@@ -165,15 +156,10 @@ internal static class PropertyModelFactory
 
             if (!getterConversion.Exists)
             {
-                return new AnalysisResult<PropertyModel>.Failure(Diagnostic.Create(
-                    descriptor: Diagnostics.InvalidGetterConversionRule,
-                    location: diagnosticLocation,
-                    messageArgs:
-                    [
-                        fieldName,
-                        fieldTypeSymbol.ToDisplayString(MinimallyQualifiedFormat),
-                        propertyTypeSymbol.ToDisplayString(MinimallyQualifiedFormat)
-                    ]
+                return new AnalysisResult<PropertyModel>.Failure(Diagnostics.InvalidGetterConversion(
+                    fieldSymbol,
+                    propertyTypeSymbol,
+                    diagnosticLocation
                 ));
             }
 
@@ -188,19 +174,18 @@ internal static class PropertyModelFactory
 
         if (propertyName.Length < 1)
         {
-            return new AnalysisResult<PropertyModel>.Failure(Diagnostic.Create(
-                descriptor: Diagnostics.InvalidPropertyNameAfterPrefixRemovalRule,
-                location: fieldSymbol.Locations.FirstOrDefault(),
-                messageArgs: [fieldName, prefixRegex]
+            return new AnalysisResult<PropertyModel>.Failure(Diagnostics.InvalidPropertyNameAfterPrefixRemoval(
+                fieldSymbol,
+                prefixRegex
             ));
         }
 
         if (propertyName == fieldName)
         {
-            return new AnalysisResult<PropertyModel>.Failure(Diagnostic.Create(
-                descriptor: Diagnostics.PropertyNameSameAsFieldNameRule,
-                location: fieldSymbol.Locations.FirstOrDefault(),
-                messageArgs: [fieldName, prefixRegex, propertyName]
+            return new AnalysisResult<PropertyModel>.Failure(Diagnostics.PropertyNameSameAsFieldName(
+                fieldSymbol,
+                prefixRegex,
+                propertyName
             ));
         }
 
@@ -214,19 +199,17 @@ internal static class PropertyModelFactory
             {
                 if (setterNameValue is not string setterName || !IsValidSetterMethodName(setterName))
                 {
-                    return new AnalysisResult<PropertyModel>.Failure(Diagnostic.Create(
-                        descriptor: Diagnostics.InvalidSetterMethodNameRule,
-                        location: fieldSymbol.Locations.FirstOrDefault(),
-                        messageArgs: [fieldName, setterNameValue]
+                    return new AnalysisResult<PropertyModel>.Failure(Diagnostics.InvalidSetterMethodName(
+                        fieldSymbol,
+                        setterNameValue
                     ));
                 }
 
                 if (fieldSymbol.IsReadOnly)
                 {
-                    return new AnalysisResult<PropertyModel>.Failure(Diagnostic.Create(
-                        descriptor: Diagnostics.ReadonlySetterMethodRule,
-                        location: fieldSymbol.Locations.FirstOrDefault(),
-                        messageArgs: [fieldName, setterName]
+                    return new AnalysisResult<PropertyModel>.Failure(Diagnostics.ReadonlySetterMethod(
+                        fieldSymbol,
+                        setterName
                     ));
                 }
 

@@ -24,7 +24,7 @@ internal static class PropertyGenerationDefaultsResolver
 
         if (accessModifier == PropertyAccessModifier.File)
         {
-            diagnostics.Add(CreateInvalidProjectOptionDiagnostic(
+            diagnostics.Add(Diagnostics.InvalidProjectOption(
                 key: ProjectGenerationOptions.AccessModifierKey,
                 value: options.AccessModifier!
             ));
@@ -43,11 +43,7 @@ internal static class PropertyGenerationDefaultsResolver
 
         if (!TryGetPrefixRegex(prefixPattern, out var prefixRegex))
         {
-            diagnostics.Add(Diagnostic.Create(
-                descriptor: Diagnostics.InvalidPrefixPatternRule,
-                location: Location.None,
-                messageArgs: [prefixPattern]
-            ));
+            diagnostics.Add(Diagnostics.InvalidPrefixPattern(prefixPattern, Location.None));
             prefixRegex = DefaultRegex;
         }
 
@@ -75,13 +71,12 @@ internal static class PropertyGenerationDefaultsResolver
         if (prefixDefaultsAttribute != null && !TryGetPrefixRegex(prefixPatternArgument, out prefixRegex))
         {
             defaults = default;
-            diagnostic = Diagnostic.Create(
-                descriptor: Diagnostics.InvalidPrefixPatternRule,
+            diagnostic = Diagnostics.InvalidPrefixPattern(
+                prefixPatternValue: prefixPatternArgument,
                 location: prefixDefaultsAttribute
                     .ApplicationSyntaxReference?
                     .GetSyntax(cancellationToken)
-                    .GetLocation(),
-                messageArgs: [prefixPatternArgument]
+                    .GetLocation()
             );
 
             return false;
@@ -171,18 +166,9 @@ internal static class PropertyGenerationDefaultsResolver
             return option;
         }
 
-        diagnostics.Add(CreateInvalidProjectOptionDiagnostic(key, value));
+        diagnostics.Add(Diagnostics.InvalidProjectOption(key, value));
 
         return defaultValue;
-    }
-
-    private static Diagnostic CreateInvalidProjectOptionDiagnostic(string key, string value)
-    {
-        return Diagnostic.Create(
-            descriptor: Diagnostics.InvalidProjectOptionRule,
-            location: Location.None,
-            messageArgs: [key, value]
-        );
     }
 
     private static bool IsUnsetProjectOption(string? value)

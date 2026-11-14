@@ -125,11 +125,12 @@ public class PropertyAccessorGeneratorDiagnosticTests
             out var diagnostics
         );
 
-        Assert.That(diagnostics, Has.Some.Matches<Diagnostic>(diagnostic =>
-            diagnostic.Id == "MPROP0006" &&
-            diagnostic.GetMessage().Contains("string") &&
-            diagnostic.GetMessage().Contains("int")
-        ));
+        var diagnostic = diagnostics.Single(diagnostic => diagnostic.Id == "MPROP0006");
+        var location = diagnostic.Location.GetLineSpan().StartLinePosition;
+
+        Assert.That(diagnostic.Severity, Is.EqualTo(DiagnosticSeverity.Error));
+        Assert.That(diagnostic.GetMessage(), Is.EqualTo("Field '_answer' of type 'string' cannot be cast to property type 'int'."));
+        Assert.That(location.Line, Is.EqualTo(4));
     }
 
     [Test]
@@ -507,6 +508,17 @@ public class PropertyAccessorGeneratorDiagnosticTests
             out var diagnostics
         );
 
-        Assert.That(diagnostics.Count(diagnostic => diagnostic.Id == "MPROP0010"), Is.EqualTo(4));
+        var messages = diagnostics
+            .Where(diagnostic => diagnostic.Id == "MPROP0010")
+            .Select(diagnostic => diagnostic.GetMessage());
+        string[] expectedMessages =
+        [
+            "Setter method 'SetCount' for field '_count' conflicts with another member.",
+            "Setter method 'Value' for field '_answer' conflicts with another member.",
+            "Setter method 'Update' for field '_first' conflicts with another member.",
+            "Setter method 'Update' for field '_second' conflicts with another member."
+        ];
+
+        Assert.That(messages, Is.EquivalentTo(expectedMessages));
     }
 }

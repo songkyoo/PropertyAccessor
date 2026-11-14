@@ -33,16 +33,11 @@ internal static class PropertyOverrideAnalysis
 
         if (mismatchReason != null)
         {
-            return new AnalysisResult<PropertyModel>.Failure(Diagnostic.Create(
-                descriptor: Diagnostics.IncompatiblePropertyOverrideRule,
-                location: field.Locations.FirstOrDefault(),
-                messageArgs:
-                [
-                    model.Name,
-                    field.Name,
-                    baseProperty.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat),
-                    mismatchReason
-                ]
+            return new AnalysisResult<PropertyModel>.Failure(Diagnostics.IncompatiblePropertyOverride(
+                field,
+                propertyName: model.Name,
+                baseProperty,
+                mismatchReason
             ));
         }
 
