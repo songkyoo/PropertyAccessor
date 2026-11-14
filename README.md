@@ -169,7 +169,7 @@ public override int Count
 
 ### PropertyGenerationDefaults 옵션
 
-`PropertyGenerationDefaults`는 해당 타입에서 생성되는 프로퍼티에 적용할 기본 옵션을 지정합니다.
+`PropertyGenerationDefaults`는 해당 타입에서 생성되는 프로퍼티에 적용할 기본 옵션을 지정합니다. 여러 타입이 공유하는 기본값은 [프로젝트 기본값](#프로젝트-기본값)에서 설정할 수 있습니다.
 
 - `AccessModifier` PropertyAccessModifier: 프로퍼티를 생성할 때 사용할 접근 한정자를 지정합니다. 기본값은 `Public`입니다.
 - `PrefixPattern` string?: 필드 이름에서 제거할 접두어를 나타내는 정규식 문자열입니다. 기본값은 `null`로 기본값을 지정하면 `^(_|m_)`를 사용합니다. 빈 문자열을 지정하면 접두어 제거를 수행하지 않습니다.
@@ -205,7 +205,7 @@ partial class Foo
 }
 ```
 
-중첩 타입은 각 옵션을 자신에게 가장 가까운 바깥 타입부터 찾아 상속합니다. 중첩 타입에 지정한 옵션만 바깥 타입의 값을 덮어씁니다. `PrefixPattern`을 생략하면 바깥 타입의 값을 따르고, 바깥 타입에도 설정이 없으면 기본 정규식을 사용합니다. `PrefixPattern = null`은 상속을 끊고 기본 정규식을 사용하며, `PrefixPattern = ""`은 정규식을 사용하지 않습니다. 다른 옵션을 라이브러리 기본값으로 되돌리려면 `AccessModifier = PropertyAccessModifier.Public`, `NamingRule = PropertyNamingRule.PascalCase`를 명시합니다.
+중첩 타입은 각 옵션을 자신에게 가장 가까운 바깥 타입부터 찾아 상속합니다. 중첩 타입에 지정한 옵션만 바깥 타입의 값을 덮어씁니다. `PrefixPattern`을 생략하면 바깥 타입과 프로젝트 설정에서 차례로 값을 찾습니다. `PrefixPattern = null`은 라이브러리 기본 정규식을 사용하며, `PrefixPattern = ""`은 접두어를 제거하지 않습니다. 다른 옵션을 라이브러리 기본값으로 되돌리려면 `AccessModifier = PropertyAccessModifier.Public`, `NamingRule = PropertyNamingRule.PascalCase`를 명시합니다.
 
 ```csharp
 using Macaron.PropertyAccessor;
@@ -230,9 +230,26 @@ public partial class Foo
 }
 ```
 
+#### 프로젝트 기본값
+
+전역 AnalyzerConfig 파일에 접근 한정자, 접두어 정규식, 이름 규칙의 프로젝트 기본값을 지정할 수 있습니다.
+
+```text
+is_global = true
+
+macaron_property_accessor.access_modifier = Internal
+macaron_property_accessor.prefix_pattern = ^(m_|_)
+macaron_property_accessor.naming_rule = PascalCase
+```
+
+`PropertyGenerationDefaults`에 지정한 옵션은 프로젝트 기본값보다 우선합니다. 생략한 프로젝트 옵션에는 라이브러리 기본값이 적용됩니다. [옵션과 우선순위](docs/generation-rules.md#프로젝트-기본값)
+
+- .NET 프로젝트에서는 프로젝트 디렉터리에 `.globalconfig`를 둡니다. 여러 프로젝트에서 공유하려면 공통 상위 디렉터리에 두면 됩니다. 다른 이름으로 저장한 파일은 프로젝트의 `GlobalAnalyzerConfigFiles` 항목에 추가합니다. [전역 AnalyzerConfig 설정](https://learn.microsoft.com/dotnet/fundamentals/code-analysis/configuration-files#global-analyzerconfig)
+- **Unity 프로젝트**에서는 `Assets/Default.globalconfig`에 같은 내용을 넣습니다. Unity는 기본 스크립트 어셈블리와 `.asmdef` 어셈블리의 컴파일에 이 파일을 전달합니다. 어셈블리 전용 `.globalconfig`가 있으면 Unity는 그 파일을 대신 사용하므로, 해당 어셈블리에도 필요한 공통 옵션을 전용 파일에 포함합니다. [Unity AnalyzerConfigPath 문서](https://docs.unity3d.com/6000.0/Documentation/ScriptReference/Compilation.ScriptCompilerOptions.AnalyzerConfigPath.html)
+
 #### 필드별 이름과 접근 한정자 지정하기
 
-필드별 프로퍼티 이름은 `Get` 또는 `GetSet`의 `name` 생성자 인수로, 접근 한정자는 `AccessModifier` 프로퍼티로 지정할 수 있습니다. 지정하지 않은 값은 타입에 적용된 `PropertyGenerationDefaults` 옵션을 따릅니다.
+필드별 프로퍼티 이름은 `Get` 또는 `GetSet`의 `name` 생성자 인수로, 접근 한정자는 `AccessModifier` 프로퍼티로 지정할 수 있습니다. 지정하지 않은 값은 타입에서 해석한 기본 옵션을 따릅니다.
 
 ```csharp
 using Macaron.PropertyAccessor;

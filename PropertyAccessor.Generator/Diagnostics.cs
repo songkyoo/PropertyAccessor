@@ -2,7 +2,7 @@
 
 namespace Macaron.PropertyAccessor;
 
-public sealed class Diagnostics
+public static class Diagnostics
 {
     public static readonly DiagnosticDescriptor TypeMustBePartialRule = new(
         id: "MPROP0001",
@@ -98,6 +98,15 @@ public sealed class Diagnostics
         id: "MPROP0011",
         title: "Generated property cannot override inherited property",
         messageFormat: "Generated property '{0}' for field '{1}' cannot override '{2}': {3}.",
+        category: "Usage",
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true
+    );
+
+    public static readonly DiagnosticDescriptor InvalidProjectOptionRule = new(
+        id: "MPROP0012",
+        title: "Invalid project generation option",
+        messageFormat: "Project generation option '{0}' has an invalid value '{1}'.",
         category: "Usage",
         defaultSeverity: DiagnosticSeverity.Error,
         isEnabledByDefault: true

@@ -51,18 +51,24 @@ public sealed class PropertyAccessorGenerator : IIncrementalGenerator
             )
             .Where(static attributeContext => attributeContext != null)
             .Select(static (attributeContext, _) => attributeContext!);
+        var projectGenerationOptionsProvider = context
+            .AnalyzerConfigOptionsProvider
+            .Select(static (provider, _) => ProjectGenerationOptions.Read(provider.GlobalOptions));
 
         var analysisResultProvider = getAttributeContextProvider
             .Collect()
             .Combine(getSetAttributeContextProvider.Collect())
             .Combine(defaultsAttributeContextProvider.Collect())
-            .Select(static (attributeContexts, cancellationToken) =>
+            .Combine(projectGenerationOptionsProvider)
+            .Select(static (input, cancellationToken) =>
             {
+                var (attributeContexts, projectGenerationOptions) = input;
                 var ((getAttributeContexts, getSetAttributeContexts), defaultsAttributeContexts) = attributeContexts;
-                var typeAnalysisResults = AnalysisContextFactory.GetTypeContexts(
+                var typeAnalysisResults = TypeContextFactory.GetTypeContexts(
                     getAttributeContexts,
                     getSetAttributeContexts,
                     defaultsAttributeContexts,
+                    projectGenerationOptions,
                     cancellationToken
                 );
 

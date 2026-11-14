@@ -42,7 +42,7 @@ internal static class GenerationModelFactory
         CancellationToken cancellationToken
     )
     {
-        var propertyAnalysisResults = AnalysisContextFactory.GetPropertyModels(
+        var propertyAnalysisResults = PropertyModelFactory.GetPropertyModels(
             typeContext,
             cancellationToken
         );
@@ -124,6 +124,7 @@ internal static class GenerationModelFactory
     private static string GetTypeNameString(INamedTypeSymbol typeSymbol)
     {
         var typeName = GetEscapedIdentifier(typeSymbol.Name);
+
         if (typeSymbol.TypeParameters.Length == 0)
         {
             return typeName;
@@ -173,8 +174,7 @@ internal static class GenerationModelFactory
 
     private static string GetEscapedIdentifier(string identifier)
     {
-        return GetKeywordKind(identifier) != SyntaxKind.None
-            || GetContextualKeywordKind(identifier) != SyntaxKind.None
+        return GetKeywordKind(identifier) != SyntaxKind.None || GetContextualKeywordKind(identifier) != SyntaxKind.None
             ? "@" + identifier
             : identifier;
     }
