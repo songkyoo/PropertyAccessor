@@ -9,7 +9,6 @@ namespace Macaron.PropertyAccessor.Tests;
 [TestFixture]
 public class PropertyAccessorGeneratorProjectDefaultsTests
 {
-    #region Static
     private static AnalyzerConfigOptionsProvider GetGlobalOptions(Project project, string options)
     {
         const string fileName = "Default.globalconfig";
@@ -28,9 +27,174 @@ public class PropertyAccessorGeneratorProjectDefaultsTests
     {
         return GetGlobalOptions(workspace.AddProject("ProjectDefaults", LanguageNames.CSharp), options);
     }
-    #endregion
 
-    #region Tests
+    [Test]
+    public void Should_ApplyAssemblyDefaultsBetweenTypeAndProjectDefaults()
+    {
+        var compilation = CreateCompilation(
+            """
+            using Macaron.PropertyAccessor;
+
+            [assembly: PropertyGenerationDefaults(
+                AccessModifier = PropertyAccessModifier.Internal,
+                PrefixPattern = "^s_"
+            )]
+
+            public partial class Foo
+            {
+                [Get]
+                private int s_Count;
+            }
+
+            [PropertyGenerationDefaults(AccessModifier = PropertyAccessModifier.Protected)]
+            public partial class Outer
+            {
+                [PropertyGenerationDefaults(NamingRule = PropertyNamingRule.PascalCase)]
+                public partial class Inner
+                {
+                    [Get]
+                    private int s_Count;
+
+                    [GetSet("Total", AccessModifier = PropertyAccessModifier.Private)]
+                    private int s_Total;
+                }
+            }
+            """
+        );
+        using var workspace = new AdhocWorkspace();
+        var options = GetGlobalOptions(
+            workspace,
+            """
+            macaron_property_accessor.access_modifier = Public
+            macaron_property_accessor.prefix_pattern = ^m_
+            macaron_property_accessor.naming_rule = CamelCase
+            """
+        );
+        var driver = CreateGeneratorDriver().WithUpdatedAnalyzerConfigOptions(options);
+
+        driver.RunGeneratorsAndUpdateCompilation(compilation, out var output, out var diagnostics);
+
+        var foo = output.GetTypeByMetadataName("Foo")!;
+        var inner = output.GetTypeByMetadataName("Outer+Inner")!;
+        var assemblyCount = (IPropertySymbol)foo.GetMembers("count").Single();
+        var typeCount = (IPropertySymbol)inner.GetMembers("Count").Single();
+        var fieldTotal = (IPropertySymbol)inner.GetMembers("Total").Single();
+        var errors = output.GetDiagnostics().Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error);
+
+        Assert.That(diagnostics, Is.Empty);
+        Assert.That(errors, Is.Empty);
+        Assert.That(assemblyCount.DeclaredAccessibility, Is.EqualTo(Accessibility.Internal));
+        Assert.That(typeCount.DeclaredAccessibility, Is.EqualTo(Accessibility.Protected));
+        Assert.That(fieldTotal.DeclaredAccessibility, Is.EqualTo(Accessibility.Private));
+    }
+
+    [TestCase("null", "Value")]
+    [TestCase("\"\"", "M_Value")]
+    public void Should_OverrideProjectPrefixPattern_When_AssemblySpecifiesNullOrEmpty(string pattern, string propertyName)
+    {
+        var compilation = CreateCompilation(
+            $$"""
+            using Macaron.PropertyAccessor;
+
+            [assembly: PropertyGenerationDefaults(PrefixPattern = {{pattern}})]
+
+            public partial class Foo
+            {
+                [Get]
+                private int m_Value;
+            }
+            """
+        );
+        using var workspace = new AdhocWorkspace();
+        var options = GetGlobalOptions(workspace, "macaron_property_accessor.prefix_pattern = ^m_V");
+        var driver = CreateGeneratorDriver().WithUpdatedAnalyzerConfigOptions(options);
+
+        driver.RunGeneratorsAndUpdateCompilation(compilation, out var output, out var diagnostics);
+
+        var type = output.GetTypeByMetadataName("Foo")!;
+        var errors = output.GetDiagnostics().Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error);
+
+        Assert.That(diagnostics, Is.Empty);
+        Assert.That(errors, Is.Empty);
+        Assert.That(type.GetMembers(propertyName), Has.One.InstanceOf<IPropertySymbol>());
+    }
+
+    [Test]
+    public void Should_ReportInvalidAssemblyPrefixOnceAndRetainOtherDefaults()
+    {
+        var compilation = CreateCompilation(
+            """
+            using Macaron.PropertyAccessor;
+
+            [assembly: PropertyGenerationDefaults(
+                AccessModifier = PropertyAccessModifier.Internal,
+                PrefixPattern = "[invalid"
+            )]
+
+            public partial class Foo
+            {
+                [Get]
+                private int s_Count;
+            }
+
+            public partial class Bar
+            {
+                [Get]
+                private int s_Count;
+            }
+            """
+        );
+        using var workspace = new AdhocWorkspace();
+        var options = GetGlobalOptions(workspace, "macaron_property_accessor.prefix_pattern = ^s_");
+        var driver = CreateGeneratorDriver().WithUpdatedAnalyzerConfigOptions(options);
+
+        driver.RunGeneratorsAndUpdateCompilation(compilation, out var output, out var diagnostics);
+
+        var diagnostic = diagnostics.Single();
+        var diagnosticSource = diagnostic.Location.SourceTree!.GetText().ToString(diagnostic.Location.SourceSpan);
+        var fooCount = (IPropertySymbol)output.GetTypeByMetadataName("Foo")!.GetMembers("Count").Single();
+        var barCount = (IPropertySymbol)output.GetTypeByMetadataName("Bar")!.GetMembers("Count").Single();
+        var errors = output.GetDiagnostics().Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error);
+
+        Assert.That(diagnostic.Id, Is.EqualTo("MAPA0004"));
+        Assert.That(diagnostic.GetMessage(), Does.Contain("[invalid"));
+        Assert.That(diagnosticSource, Does.StartWith("PropertyGenerationDefaults("));
+        Assert.That(errors, Is.Empty);
+        Assert.That(fooCount.DeclaredAccessibility, Is.EqualTo(Accessibility.Internal));
+        Assert.That(barCount.DeclaredAccessibility, Is.EqualTo(Accessibility.Internal));
+    }
+
+    [Test]
+    public void Should_UseProjectDefaults_When_AssemblyAttributeIsDuplicated()
+    {
+        var compilation = CreateCompilation(
+            """
+            using Macaron.PropertyAccessor;
+
+            [assembly: PropertyGenerationDefaults(AccessModifier = PropertyAccessModifier.Internal)]
+            [assembly: PropertyGenerationDefaults(AccessModifier = PropertyAccessModifier.Private)]
+
+            public partial class Foo
+            {
+                [Get]
+                private int s_Count;
+            }
+            """
+        );
+        using var workspace = new AdhocWorkspace();
+        var options = GetGlobalOptions(workspace, "macaron_property_accessor.prefix_pattern = ^s_");
+        var driver = CreateGeneratorDriver().WithUpdatedAnalyzerConfigOptions(options);
+
+        driver.RunGeneratorsAndUpdateCompilation(compilation, out var output, out var diagnostics);
+
+        var count = (IPropertySymbol)output.GetTypeByMetadataName("Foo")!.GetMembers("Count").Single();
+        var errors = output.GetDiagnostics().Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error);
+
+        Assert.That(diagnostics, Is.Empty);
+        Assert.That(errors.Select(diagnostic => diagnostic.Id), Is.EquivalentTo(new[] { "CS0579" }));
+        Assert.That(count.DeclaredAccessibility, Is.EqualTo(Accessibility.Public));
+    }
+
     [Test]
     public void Should_MergeProjectDefaultsWithTypeAndFieldOptions()
     {
@@ -270,5 +434,4 @@ public class PropertyAccessorGeneratorProjectDefaultsTests
         Assert.That(correctedResult.GeneratedSources, Has.Length.EqualTo(1));
         Assert.That(correctedGeneration.Reason, Is.EqualTo(IncrementalStepRunReason.Cached));
     }
-    #endregion
 }

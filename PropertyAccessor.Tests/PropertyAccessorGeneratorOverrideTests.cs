@@ -10,7 +10,6 @@ namespace Macaron.PropertyAccessor.Tests;
 [TestFixture]
 public class PropertyAccessorGeneratorOverrideTests
 {
-    #region Static
     private static (Compilation Output, GeneratorRunResult Result) Generate(CSharpCompilation compilation)
     {
         var driver = CreateGeneratorDriver().RunGeneratorsAndUpdateCompilation(
@@ -33,9 +32,7 @@ public class PropertyAccessorGeneratorOverrideTests
 
         return MetadataReference.CreateFromImage(stream.ToArray());
     }
-    #endregion
 
-    #region Tests
     [Test]
     public void Should_GenerateGetSetOverride_When_PropertyContractMatches()
     {
@@ -792,5 +789,4 @@ public class PropertyAccessorGeneratorOverrideTests
             loadContext.Unload();
         }
     }
-    #endregion
 }

@@ -50,10 +50,49 @@ internal static class PropertyGenerationDefaultsResolver
         return new ResolvedPropertyGenerationDefaults(accessModifier, prefixRegex, namingRule);
     }
 
+    public static ResolvedPropertyGenerationDefaults ResolveAssemblyDefaults(
+        AttributeData? attribute,
+        ResolvedPropertyGenerationDefaults projectDefaults,
+        ImmutableArray<Diagnostic>.Builder diagnostics,
+        CancellationToken cancellationToken
+    )
+    {
+        if (attribute == null)
+        {
+            return projectDefaults;
+        }
+
+        var hasPrefixPattern = TryGetNamedArgumentValue(
+            attribute,
+            name: nameof(PropertyGenerationDefaultsAttribute.PrefixPattern),
+            out var prefixPattern
+        );
+        var prefixRegex = projectDefaults.PrefixRegex;
+
+        if (hasPrefixPattern && !TryGetPrefixRegex(prefixPattern, out prefixRegex))
+        {
+            diagnostics.Add(CreateInvalidPrefixPatternDiagnostic(attribute, prefixPattern, cancellationToken));
+            prefixRegex = projectDefaults.PrefixRegex;
+        }
+
+        TryGetNamedArgumentValue(
+            attribute,
+            name: nameof(PropertyGenerationDefaultsAttribute.AccessModifier),
+            out var accessModifier
+        );
+        TryGetNamedArgumentValue(
+            attribute,
+            name: nameof(PropertyGenerationDefaultsAttribute.NamingRule),
+            out var namingRule
+        );
+
+        return ApplyAttributeDefaults(projectDefaults, accessModifier, prefixRegex, namingRule);
+    }
+
     public static bool TryResolveTypeDefaults(
         INamedTypeSymbol typeSymbol,
         IReadOnlyDictionary<INamedTypeSymbol, AttributeData> defaultsAttributeByType,
-        ResolvedPropertyGenerationDefaults projectDefaults,
+        ResolvedPropertyGenerationDefaults assemblyDefaults,
         CancellationToken cancellationToken,
         out ResolvedPropertyGenerationDefaults defaults,
         [NotNullWhen(false)] out Diagnostic? diagnostic
@@ -66,44 +105,61 @@ internal static class PropertyGenerationDefaultsResolver
             includeNull: true,
             out var prefixDefaultsAttribute
         );
-        var prefixRegex = projectDefaults.PrefixRegex;
+        var prefixRegex = assemblyDefaults.PrefixRegex;
 
         if (prefixDefaultsAttribute != null && !TryGetPrefixRegex(prefixPatternArgument, out prefixRegex))
         {
             defaults = default;
-            diagnostic = Diagnostics.InvalidPrefixPattern(
-                prefixPatternValue: prefixPatternArgument,
-                location: prefixDefaultsAttribute
-                    .ApplicationSyntaxReference?
-                    .GetSyntax(cancellationToken)
-                    .GetLocation()
+            diagnostic = CreateInvalidPrefixPatternDiagnostic(
+                prefixDefaultsAttribute,
+                prefixPatternArgument,
+                cancellationToken
             );
 
             return false;
         }
 
-        defaults = new ResolvedPropertyGenerationDefaults(
-            AccessModifier: PropertyAccessModifierResolver.Resolve(
-                GetInheritedNamedArgumentValue(
-                    typeSymbol,
-                    defaultsAttributeByType,
-                    name: nameof(PropertyGenerationDefaultsAttribute.AccessModifier)
-                ),
-                projectDefaults.AccessModifier
-            ),
-            PrefixRegex: prefixRegex,
-            NamingRule: GetNamingRule(
-                GetInheritedNamedArgumentValue(
-                    typeSymbol,
-                    defaultsAttributeByType,
-                    name: nameof(PropertyGenerationDefaultsAttribute.NamingRule)
-                ),
-                projectDefaults.NamingRule
-            )
+        var accessModifier = GetInheritedNamedArgumentValue(
+            typeSymbol,
+            defaultsAttributeByType,
+            name: nameof(PropertyGenerationDefaultsAttribute.AccessModifier)
         );
+        var namingRule = GetInheritedNamedArgumentValue(
+            typeSymbol,
+            defaultsAttributeByType,
+            name: nameof(PropertyGenerationDefaultsAttribute.NamingRule)
+        );
+
+        defaults = ApplyAttributeDefaults(assemblyDefaults, accessModifier, prefixRegex, namingRule);
         diagnostic = null;
 
         return true;
+    }
+
+    private static ResolvedPropertyGenerationDefaults ApplyAttributeDefaults(
+        ResolvedPropertyGenerationDefaults fallback,
+        object? accessModifier,
+        Regex? prefixRegex,
+        object? namingRule
+    )
+    {
+        return new ResolvedPropertyGenerationDefaults(
+            AccessModifier: PropertyAccessModifierResolver.Resolve(accessModifier, fallback.AccessModifier),
+            PrefixRegex: prefixRegex,
+            NamingRule: GetNamingRule(namingRule, fallback.NamingRule)
+        );
+    }
+
+    private static Diagnostic CreateInvalidPrefixPatternDiagnostic(
+        AttributeData attribute,
+        object? prefixPattern,
+        CancellationToken cancellationToken
+    )
+    {
+        return Diagnostics.InvalidPrefixPattern(
+            prefixPattern,
+            location: attribute.ApplicationSyntaxReference?.GetSyntax(cancellationToken).GetLocation()
+        );
     }
 
     private static object? GetInheritedNamedArgumentValue(
@@ -125,25 +181,39 @@ internal static class PropertyGenerationDefaultsResolver
     {
         for (var currentType = typeSymbol; currentType != null; currentType = currentType.ContainingType)
         {
-            if (!defaultsAttributeByType.TryGetValue(currentType, out var attribute))
+            if (!defaultsAttributeByType.TryGetValue(currentType, out var attribute)
+                || !TryGetNamedArgumentValue(attribute, name, out var value)
+                || (!includeNull && value == null)
+            )
             {
                 continue;
             }
 
-            foreach (var namedArgument in attribute.NamedArguments)
-            {
-                if (namedArgument.Key == name && (includeNull || namedArgument.Value.Value != null))
-                {
-                    definingAttribute = attribute;
+            definingAttribute = attribute;
 
-                    return namedArgument.Value.Value;
-                }
-            }
+            return value;
         }
 
         definingAttribute = null;
 
         return null;
+    }
+
+    private static bool TryGetNamedArgumentValue(AttributeData attribute, string name, out object? value)
+    {
+        foreach (var namedArgument in attribute.NamedArguments)
+        {
+            if (namedArgument.Key == name)
+            {
+                value = namedArgument.Value.Value;
+
+                return true;
+            }
+        }
+
+        value = null;
+
+        return false;
     }
 
     private static TEnum GetProjectEnumOption<TEnum>(

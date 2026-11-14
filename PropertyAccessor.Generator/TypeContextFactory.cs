@@ -12,6 +12,7 @@ internal static class TypeContextFactory
         ImmutableArray<AccessorAttributeContext> getAttributeContexts,
         ImmutableArray<AccessorAttributeContext> getSetAttributeContexts,
         ImmutableArray<PropertyGenerationDefaultsAttributeContext> defaultsAttributeContexts,
+        AttributeData? assemblyDefaultsAttribute,
         ProjectGenerationOptions projectOptions,
         CancellationToken cancellationToken
     )
@@ -47,16 +48,22 @@ internal static class TypeContextFactory
             }
         }
 
-        if (compilationByType.Count == 0)
+        if (compilationByType.Count == 0 && assemblyDefaultsAttribute == null)
         {
             return ImmutableArray<AnalysisResult<TypeContext>>.Empty;
         }
 
         var builder = ImmutableArray.CreateBuilder<AnalysisResult<TypeContext>>(compilationByType.Count);
-        var projectDiagnostics = ImmutableArray.CreateBuilder<Diagnostic>();
+        var defaultDiagnostics = ImmutableArray.CreateBuilder<Diagnostic>();
         var projectDefaults = PropertyGenerationDefaultsResolver.ResolveProjectDefaults(
             projectOptions,
-            projectDiagnostics
+            defaultDiagnostics
+        );
+        var assemblyDefaults = PropertyGenerationDefaultsResolver.ResolveAssemblyDefaults(
+            assemblyDefaultsAttribute,
+            projectDefaults,
+            defaultDiagnostics,
+            cancellationToken
         );
 
         foreach (var entry in compilationByType)
@@ -106,7 +113,7 @@ internal static class TypeContextFactory
             if (!PropertyGenerationDefaultsResolver.TryResolveTypeDefaults(
                 typeSymbol,
                 defaultsAttributeByType,
-                projectDefaults,
+                assemblyDefaults,
                 cancellationToken,
                 out var defaults,
                 out var diagnostic
@@ -125,10 +132,10 @@ internal static class TypeContextFactory
             )));
         }
 
-        if (projectDiagnostics.Count > 0)
+        if (defaultDiagnostics.Count > 0)
         {
             // 기존 타입 분석 결과의 순서를 유지해 설정 진단만 바뀔 때 생성 모델 캐시를 재사용한다.
-            builder.Add(new AnalysisResult<TypeContext>.Failure(projectDiagnostics.ToImmutable()));
+            builder.Add(new AnalysisResult<TypeContext>.Failure(defaultDiagnostics.ToImmutable()));
         }
 
         return builder.ToImmutable();

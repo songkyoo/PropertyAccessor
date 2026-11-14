@@ -8,7 +8,6 @@ namespace Macaron.PropertyAccessor.Tests;
 [TestFixture]
 public class PropertyAccessorGeneratorIncrementalTests
 {
-    #region Static
     private static IReadOnlyList<IncrementalStepRunReason> GetGenerationModelRunReasons(GeneratorDriver driver)
     {
         var result = driver.GetRunResult().Results.Single();
@@ -19,9 +18,7 @@ public class PropertyAccessorGeneratorIncrementalTests
             .Select(output => output.Reason)
             .ToArray();
     }
-    #endregion
 
-    #region Tests
     [Test]
     public void Should_CacheGenerationModels_When_CompilationIsUnchanged()
     {
@@ -220,6 +217,62 @@ public class PropertyAccessorGeneratorIncrementalTests
         Assert.That(generatedSources.Any(source => source.SourceText.ToString().Contains("internal int Value")), Is.True);
     }
     [Test]
+    public void Should_OnlyModifyDependentGenerationModel_When_AssemblyDefaultsChangeInAnotherFile()
+    {
+        var compilation = CreateCompilation(
+            """
+            using Macaron.PropertyAccessor;
+
+            public partial class Foo
+            {
+                [Get]
+                private int _value;
+            }
+
+            [PropertyGenerationDefaults(AccessModifier = PropertyAccessModifier.Public)]
+            public partial class Bar
+            {
+                [Get]
+                private int _value;
+            }
+            """
+        );
+        var assemblyDefaults = CSharpSyntaxTree.ParseText(
+            """
+            using Macaron.PropertyAccessor;
+
+            [assembly: PropertyGenerationDefaults(AccessModifier = PropertyAccessModifier.Internal)]
+            """
+        );
+
+        compilation = compilation.AddSyntaxTrees(assemblyDefaults);
+
+        var driver = CreateGeneratorDriver(trackIncrementalGeneratorSteps: true);
+
+        driver = driver.RunGenerators(compilation);
+
+        var updatedAssemblyDefaults = CSharpSyntaxTree.ParseText(
+            """
+            using Macaron.PropertyAccessor;
+
+            [assembly: PropertyGenerationDefaults(AccessModifier = PropertyAccessModifier.Private)]
+            """
+        );
+        var updatedCompilation = compilation.ReplaceSyntaxTree(assemblyDefaults, updatedAssemblyDefaults);
+
+        driver = driver.RunGeneratorsAndUpdateCompilation(updatedCompilation, out var output, out var diagnostics);
+
+        var reasons = GetGenerationModelRunReasons(driver);
+        var fooValue = (IPropertySymbol)output.GetTypeByMetadataName("Foo")!.GetMembers("Value").Single();
+        var barValue = (IPropertySymbol)output.GetTypeByMetadataName("Bar")!.GetMembers("Value").Single();
+
+        Assert.That(diagnostics, Is.Empty);
+        Assert.That(reasons, Is.EquivalentTo(new[] { IncrementalStepRunReason.Modified, IncrementalStepRunReason.Cached }));
+        Assert.That(fooValue.DeclaredAccessibility, Is.EqualTo(Accessibility.Private));
+        Assert.That(barValue.DeclaredAccessibility, Is.EqualTo(Accessibility.Public));
+    }
+
+    [Test]
     public void Should_OnlyModifyOverrideModel_When_BasePropertyBecomesAbstractInAnotherFile()
     {
         const string sourceCode =
@@ -405,5 +458,4 @@ public class PropertyAccessorGeneratorIncrementalTests
         Assert.That(generatedSource, Does.Not.Contain("override"));
         Assert.That(compilerDiagnostics, Has.Some.Matches<Diagnostic>(diagnostic => diagnostic.Id == "CS0114"));
     }
-    #endregion
 }

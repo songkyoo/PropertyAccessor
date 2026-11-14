@@ -6,7 +6,6 @@ namespace Macaron.PropertyAccessor.Tests;
 
 internal static class Helper
 {
-    #region Static
     public static void AssertGeneratedCode(
         string sourceCode,
         string expected,
@@ -93,5 +92,4 @@ internal static class Helper
 
         return (allDiagnostics, generatedCode);
     }
-    #endregion
 }

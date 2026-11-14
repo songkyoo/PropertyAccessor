@@ -51,6 +51,9 @@ public sealed class PropertyAccessorGenerator : IIncrementalGenerator
             )
             .Where(static attributeContext => attributeContext != null)
             .Select(static (attributeContext, _) => attributeContext!);
+        var assemblyDefaultsAttributeProvider = context
+            .CompilationProvider
+            .Select(static (compilation, _) => AnalysisContextFactory.GetAssemblyDefaultsAttribute(compilation));
         var projectGenerationOptionsProvider = context
             .AnalyzerConfigOptionsProvider
             .Select(static (provider, _) => ProjectGenerationOptions.Read(provider.GlobalOptions));
@@ -59,15 +62,17 @@ public sealed class PropertyAccessorGenerator : IIncrementalGenerator
             .Collect()
             .Combine(getSetAttributeContextProvider.Collect())
             .Combine(defaultsAttributeContextProvider.Collect())
+            .Combine(assemblyDefaultsAttributeProvider)
             .Combine(projectGenerationOptionsProvider)
             .Select(static (input, cancellationToken) =>
             {
-                var (attributeContexts, projectGenerationOptions) = input;
+                var ((attributeContexts, assemblyDefaultsAttribute), projectGenerationOptions) = input;
                 var ((getAttributeContexts, getSetAttributeContexts), defaultsAttributeContexts) = attributeContexts;
                 var typeAnalysisResults = TypeContextFactory.GetTypeContexts(
                     getAttributeContexts,
                     getSetAttributeContexts,
                     defaultsAttributeContexts,
+                    assemblyDefaultsAttribute,
                     projectGenerationOptions,
                     cancellationToken
                 );
